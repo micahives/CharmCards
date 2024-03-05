@@ -1,10 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
+// component reinitialization helper from preline, reinitializes every time app is mounted or page changed
+import "preline/preline";
+import { IStaticMethods } from "preline/preline";
+declare global {
+  interface Window {
+    HSStaticMethods: IStaticMethods;
+  }
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const location = useLocation();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    window.HSStaticMethods.autoInit();
+  }, [location.pathname]);
 
   return (
     <>
