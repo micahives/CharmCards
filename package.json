@@ -1,0 +1,31 @@
+{
+    "name": "digicards",
+    "version": "1.0.0",
+    "description": "",
+    "main": "server/server.ts",
+    "type": "module",
+    "scripts": {
+        "start": "npx tsx server/server.ts --ignore client",
+        "develop": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
+        "dev": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
+        "install": "cd server && npm i && cd ../client && npm i",
+        "seed": "cd server && npm run seed",
+        "build": "cd client && npm run build"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/node": "^20.11.24",
+        "concurrently": "^5.1.0",
+        "nodemon": "^3.1.0",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3"
+    },
+    "dependencies": {
+        "dotenv": "^16.4.5",
+        "express": "^4.18.3",
+        "tsx": "^4.7.1"
+    }
+}
