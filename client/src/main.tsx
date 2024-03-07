@@ -4,12 +4,19 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { StrictMode } from 'react';
 import './index.css';
 import Error from './pages/Error.tsx';
+import LandingPage from './pages/LandingPage.tsx';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
-    errorElement: <Error />
+    errorElement: <Error />,
+    children: [
+      {
+        index: true,
+        element: <LandingPage />
+      }
+    ]
   }
 ])
 
