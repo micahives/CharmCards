@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
+import Header from '../src/components/common/Header';
 import './App.css';
 import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
@@ -36,7 +37,6 @@ const authLink = setContext((_, { headers }) => {
   });
 
 function App() {
-  const hasToken = localStorage.getItem('id_token') !== null;
   const location = useLocation();
 
   useEffect(() => {
@@ -46,14 +46,14 @@ function App() {
 
   return (
     <ApolloProvider client={client}>
-    <div className="flex flex-col min-h-screen">
-      {hasToken}
-      <main className="flex-grow container mx-auto">
-        <Outlet />
-      </main>
-    </div>
-  </ApolloProvider>
-);
-  }
+      <Header />
+      <div className="flex flex-col min-h-screen">
+        <main className="flex-grow container mx-auto">
+          <Outlet />
+        </main>
+      </div>
+    </ApolloProvider>
+  );
+}
 
 export default App

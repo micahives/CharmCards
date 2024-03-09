@@ -1,7 +1,9 @@
+import blankCard from '../../assets/blankCard.svg';
+
 const LandingHero = () => {
     return (
         // hero div
-        <div className="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8 mt-16">
             {/* grid div */}
             <div className="grid lg:grid-cols-7 lg:gap-x-8 xl:gap-x-12 lg:items-center">
                 {/* column div */}
@@ -22,7 +24,7 @@ const LandingHero = () => {
                 </div>
                 {/* end of column div */}
                 <div className="lg:col-span-4 mt-10 lg:mt-0">
-                    <img className="w-full rounded-xl" src="https://images.unsplash.com/photo-1665686376173-ada7a0031a85?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=900&h=700&q=80" alt="Image Description"></img>
+                    <img className="w-3/4 rounded-xl" src={blankCard}></img>
                 </div>
             </div>
             {/* end of grid div */}
