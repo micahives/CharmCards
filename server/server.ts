@@ -1,22 +1,38 @@
-import express, { Express, Request, Response } from "express";
-import dotenv from "dotenv";
+import express, { Express } from "express";
+import 'dotenv/config';
+// may need path module for specifying prod vs. dev builds later on
+// import path from 'path';
 import { ApolloServer } from '@apollo/server';
-import typeDefs from './schemas/typeDefs';
-import resolvers from './schemas/resolvers';
+import { expressMiddleware } from '@apollo/server/express4';
+import { authMiddleware } from "./utils/auth";
 
-dotenv.config();
+import { typeDefs, resolvers }from './schemas';
+// can alias import since it is exported as default in config/connection
+import db from './config/connection';
 
 const app: Express = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 const server = new ApolloServer({
     typeDefs,
     resolvers
 });
 
-app.get("/", (req: Request, res: Response) => {
-  res.send("Express + TypeScript Server");
-});
+const startApolloServer = async () => {
+  await server.start();
 
-app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
-});
+  app.use(express.urlencoded({ extended: false }));
+  app.use(express.json());
+
+  app.use('/graphql', expressMiddleware(server, {
+    context: authMiddleware
+  }));
+
+  db.once('open', () => {
+    app.listen(PORT, () => {
+      console.log(`[server]: Server is running at http://localhost:${PORT}`);
+      console.log(`Use Graphql at http:localhost:${PORT}/graphql`);
+    });
+  })
+};
+
+startApolloServer();

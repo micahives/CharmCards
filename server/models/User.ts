@@ -1,6 +1,14 @@
 import { Schema, model } from 'mongoose';
 import bcrypt from 'bcrypt';
 
+// TS interface
+interface UserDocument extends Document {
+    username: string;
+    email: string;
+    password: string;
+    isCorrectPassword(password: string): Promise<boolean>;
+}
+
 const userSchema = new Schema(
     {
         username: {
@@ -21,6 +29,11 @@ const userSchema = new Schema(
     },
 );
 
+// compare and validate password for login
+userSchema.methods.isCorrectPassword = async function (password: string) {
+    return bcrypt.compare(password, this.password);
+};
+
 // hash new or updated user password
 userSchema.pre('save', async function (next) {
     if (this.isNew || this.isModified('password')) {
@@ -31,11 +44,6 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
-// compare and validate password for login
-userSchema.methods.isCorrectPassword = async function (password) {
-    return bcrypt.compare(password, this.password);
-};
-
-const User = model('User', userSchema);
+const User = model<UserDocument>('User', userSchema);
 
 export default User;

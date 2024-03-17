@@ -1,3 +1,4 @@
+// double check imports/exports on these
 import User from '../models';
 import { signToken, AuthenticationError } from '../utils/auth';
 
@@ -24,7 +25,22 @@ const resolvers = {
     },
 
     Mutation: {
+        login: async (parent, { email, password }) => {
+            let user = await User.findOne({ email });
 
+            if (!user) {
+                throw AuthenticationError;
+            }
+
+            const correctPassword = await user.isCorrectPassword(password);
+
+            if (!correctPassword) {
+                throw AuthenticationError;
+            }
+
+            const token = signToken(user);
+            return { token, user };
+        }
     }
 };
 
