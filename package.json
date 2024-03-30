@@ -5,12 +5,9 @@
     "main": "server/server.ts",
     "type": "module",
     "scripts": {
-        "start": "npx tsx server/server.ts --ignore client",
-        "develop": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
-        "dev": "concurrently \"cd server && npm run watch\" \"cd client && npm run dev\"",
+        "start": "npx tsx --no-deprecation server/server.ts --ignore client",
         "install": "cd server && npm i && cd ../client && npm i",
         "seed": "cd server && npm run seed",
-        "build": "cd client && npm run build",
         "compile": "tsc"
     },
     "keywords": [],
@@ -20,11 +17,11 @@
         "concurrently": "^8.2.2",
         "nodemon": "^3.1.0",
         "ts-node": "^10.9.2",
-        "typescript": "^5.3.3"
+        "typescript": "^5.4.3"
     },
     "dependencies": {
         "dotenv": "^16.4.5",
-        "express": "^4.18.3",
+        "express": "^4.19.1",
         "tsx": "^4.7.1"
     }
 }

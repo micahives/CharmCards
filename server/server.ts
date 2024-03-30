@@ -10,6 +10,16 @@ import { typeDefs, resolvers }from './schemas';
 // can alias import since it is exported as default in config/connection
 import db from './config/connection';
 
+// Ignore punycode deprecation warnings as it originates from TS type definition files,
+// rather than actual usage of punycode module. Updated "node --no-deprecation server.ts" in start script
+process.on('warning', (warning) => {
+  if (warning.name === 'DeprecationWarning' && warning.message.includes('punycode')) {
+    return;
+  }
+
+  console.warn(warning);
+});
+
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
 const server = new ApolloServer({
