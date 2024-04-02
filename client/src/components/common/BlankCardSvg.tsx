@@ -1,5 +1,9 @@
-import { SVGProps } from "react"
-const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => (
+import { SVGProps } from "react";
+import { motion } from "framer-motion";
+
+const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => {
+
+  return (
     <svg
     // Leave viewBox as-is but exclude width/height so SVG fits 100% in parent container
     // width={295}
@@ -9,7 +13,15 @@ const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => (
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <g id="blankCard">
+    <motion.g 
+      id="blankCard"
+      className="outline-none"
+      whileHover={{
+        scale: 1.03,
+        transition: { duration: 0.5 },
+      }}
+      whileTap={{ scale: 1.0 }}
+      >
       <g id="frontCard">
         <path
           id="frontFace"
@@ -30,7 +42,9 @@ const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => (
           />
         </g>
       </g>
-    </g>
-  </svg>
-)
-export { BlankCardSvg }
+    </motion.g>
+    </svg>
+  )
+};
+
+export { BlankCardSvg };

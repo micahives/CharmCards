@@ -1,7 +1,14 @@
+import { useState } from 'react';
 import { BlankCardSvg } from '../common/BlankCardSvg';
-// import { OpenBlankCard } from '../common/OpenBlankCardSvg';
+import { OpenBlankCardSvg } from '../common/OpenBlankCardSvg';
 
 const LandingHero = () => {
+    const [isCardOpen, setIsCardOpen] = useState(false);
+
+    const toggleCard = () => {
+        setIsCardOpen(!isCardOpen);
+    };
+
     return (
         // hero div
         <div className="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8 mt-16">
@@ -23,8 +30,10 @@ const LandingHero = () => {
                     {/* end of questionable block */}
                 </div>
                 {/* end of column div */}
-                <div className="lg:col-span-3 mt-10 lg:mt-0">
-                    <BlankCardSvg />
+                {/* TODO: click handler to change component to openCardSvg */}
+                <div className="lg:col-span-3 mt-10 lg:mt-0" onClick={toggleCard}>
+                    {/* Renders either BlankCardSvg or OpenBlankCardSvg based on state */}
+                    {isCardOpen ? <OpenBlankCardSvg /> : <BlankCardSvg />}
                 </div>
             </div>
             {/* end of grid div */}
