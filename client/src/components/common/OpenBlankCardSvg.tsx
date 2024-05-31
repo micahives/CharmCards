@@ -17,7 +17,7 @@ const OpenBlankCardSvg = (props: SVGProps<SVGSVGElement>) => {
         <motion.g 
           id="openCard"
           whileHover={{
-            scale: 1.01,
+            scale: 1.02,
             transition: { duration: 0.2 },
           }}
           >

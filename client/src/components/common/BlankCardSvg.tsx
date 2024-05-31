@@ -17,7 +17,7 @@ const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => {
       id="blankCard"
       whileHover={{
         scale: 1.02,
-        transition: { duration: 0.3 },
+        transition: { duration: 0.2 },
       }}
       >
       <g id="frontCard">
