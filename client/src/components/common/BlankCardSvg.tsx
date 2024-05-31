@@ -15,12 +15,10 @@ const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => {
   >
     <motion.g 
       id="blankCard"
-      className="outline-none"
       whileHover={{
-        scale: 1.03,
-        transition: { duration: 0.5 },
+        scale: 1.02,
+        transition: { duration: 0.3 },
       }}
-      whileTap={{ scale: 1.0 }}
       >
       <g id="frontCard">
         <path
@@ -28,7 +26,7 @@ const BlankCardSvg = (props: SVGProps<SVGSVGElement>) => {
           d="M276.077 35.9193H17.0568V398.94H276.077V35.9193Z"
           fill="white"
           stroke="black"
-          strokeWidth={0.979499}
+          strokeWidth={1.14352}
         />
         <g id="frontTop">
           <path
