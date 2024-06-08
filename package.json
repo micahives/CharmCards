@@ -1,5 +1,5 @@
 {
-    "name": "cardai",
+    "name": "charmcards",
     "version": "1.0.0",
     "description": "",
     "main": "server/server.ts",
