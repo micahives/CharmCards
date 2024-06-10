@@ -6,6 +6,7 @@ const DrawingCanvas = () => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
+    const [currentTool, setCurrentTool] = useState<'line' | 'rectangle'>('rectangle');
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const roughCanvasRef = useRef<any>(null);
@@ -24,6 +25,13 @@ const DrawingCanvas = () => {
         }
     };
 
+    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+        const rc = roughCanvasRef.current;
+        if (rc) {
+            return rc.generator.line(x1, y1, x2, y2);
+        }
+    };
+
     const clearCanvas = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -34,7 +42,6 @@ const DrawingCanvas = () => {
         }
     };
 
-    // redraws all the shapes from the shapes array when canvas is redrawn, clearing canvas, or adding new shape
     const redrawShapes = () => {
         const rc = roughCanvasRef.current;
         if (rc) {
@@ -57,13 +64,21 @@ const DrawingCanvas = () => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        if (isDrawing) {
-            const width = x - startX;
-            const height = y - startY;
-            const newShape = drawRect(startX, startY, width, height);
 
-            // Add each shape to the setShapes array displayed on the canvas
-            setShapes([...shapes, newShape]);
+        if (isDrawing) {
+            if (currentTool === 'rectangle') {
+                const width = x - startX;
+                const height = y - startY;
+                const newShape = drawRect(startX, startY, width, height);
+                if (newShape) {
+                    setShapes([...shapes, newShape]);
+                }
+            } else if (currentTool === 'line') {
+                const newShape = drawLine(startX, startY, x, y);
+                if (newShape) {
+                    setShapes([...shapes, newShape]);
+                }
+            }
             setIsDrawing(false);
         }
     };
@@ -74,33 +89,48 @@ const DrawingCanvas = () => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const width = x - startX;
-        const height = y - startY;
 
         clearCanvas();
         redrawShapes();
 
-        // prepares the drawable object, but does not render
-        const previewShape = drawRect(startX, startY, width, height);
-        // preview shape is shown while the mouse is moving to provide user feedback on their drawing
-        if (roughCanvasRef.current && previewShape) {
-            roughCanvasRef.current.draw(previewShape);
+        if (currentTool === 'rectangle') {
+            const width = x - startX;
+            const height = y - startY;
+            const previewShape = drawRect(startX, startY, width, height);
+            if (roughCanvasRef.current && previewShape) {
+                roughCanvasRef.current.draw(previewShape);
+            }
+        } else if (currentTool === 'line') {
+            const previewShape = drawLine(startX, startY, x, y);
+            if (roughCanvasRef.current && previewShape) {
+                roughCanvasRef.current.draw(previewShape);
+            }
         }
     };
 
+    const selectTool = (tool: 'line' | 'rectangle') => {
+        setCurrentTool(tool);
+    };
+
     return (
-        <canvas
-            ref={canvasRef}
-            id='canvas'
-            style={{ backgroundColor: 'white' }}
-            width={1500}
-            height={window.innerHeight}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
-        >
-            Drawing canvas
-        </canvas>
+        <div>
+            <div>
+                <button onClick={() => selectTool('rectangle')}>Rectangle</button>
+                <button onClick={() => selectTool('line')}>Line</button>
+            </div>
+            <canvas
+                ref={canvasRef}
+                id='canvas'
+                style={{ backgroundColor: 'white' }}
+                width={1500}
+                height={window.innerHeight}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                onMouseMove={handleMouseMove}
+            >
+                Drawing canvas
+            </canvas>
+        </div>
     );
 };
 
