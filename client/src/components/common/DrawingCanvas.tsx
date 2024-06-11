@@ -1,12 +1,13 @@
 import React, { useState, useLayoutEffect, useRef } from 'react';
 import rough from 'roughjs';
-
+ 
+// need: selection tool (with rotation abilities?), undo/redo, pen tool, text tool, eraser, stroke and color options
 const DrawingCanvas = () => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
-    const [currentTool, setCurrentTool] = useState<'line' | 'rectangle'>('rectangle');
+    const [currentTool, setCurrentTool] = useState<'line' | 'rectangle' | 'circle'>('rectangle');
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const roughCanvasRef = useRef<any>(null);
@@ -31,6 +32,13 @@ const DrawingCanvas = () => {
             return rc.generator.line(x1, y1, x2, y2);
         }
     };
+
+    const drawCircle = (x: number, y: number, diameter: number) => {
+        const rc = roughCanvasRef.current;
+        if (rc) {
+            return rc.generator.circle(x, y, diameter);
+        }
+    }
 
     const clearCanvas = () => {
         const canvas = canvasRef.current;
@@ -78,6 +86,13 @@ const DrawingCanvas = () => {
                 if (newShape) {
                     setShapes([...shapes, newShape]);
                 }
+            } else if (currentTool === 'circle') {
+                // diameter from Euclidean distance formula
+                const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+                const newShape = drawCircle(startX, startY, diameter);
+                if (newShape) {
+                    setShapes([...shapes, newShape]);
+                }
             }
             setIsDrawing(false);
         }
@@ -105,19 +120,43 @@ const DrawingCanvas = () => {
             if (roughCanvasRef.current && previewShape) {
                 roughCanvasRef.current.draw(previewShape);
             }
+        } else if (currentTool === 'circle') {
+            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+            const previewShape = drawCircle(startX, startY, diameter);
+            if (roughCanvasRef.current && previewShape) {
+                roughCanvasRef.current.draw(previewShape);
+            }
         }
     };
 
-    const selectTool = (tool: 'line' | 'rectangle') => {
+    const selectTool = (tool: 'line' | 'rectangle' | 'circle') => {
         setCurrentTool(tool);
     };
 
     return (
         <div>
-            <div>
-                <button onClick={() => selectTool('rectangle')}>Rectangle</button>
-                <button onClick={() => selectTool('line')}>Line</button>
-            </div>
+            {/* Radio buttons for canvas tool selection */}
+            <input
+                type='radio'
+                id='line'
+                checked={currentTool === "line"}
+                onChange={() => selectTool('line')}
+            />
+            <label htmlFor='line'>Line</label>
+            <input
+                type='radio'
+                id='rectangle'
+                checked={currentTool === "rectangle"}
+                onChange={() => selectTool('rectangle')}
+            />
+            <label htmlFor='rectangle'>Rectangle</label>
+            <input
+                type='radio'
+                id='circle'
+                checked={currentTool === "circle"}
+                onChange={() => selectTool('circle')}
+            />
+            <label htmlFor='line'>Circle</label>
             <canvas
                 ref={canvasRef}
                 id='canvas'
