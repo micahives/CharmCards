@@ -8,6 +8,9 @@ const DrawingCanvas = () => {
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
     const [currentTool, setCurrentTool] = useState<'line' | 'rectangle' | 'circle'>('rectangle');
+    
+    const [undoStack, setUndoStack] = useState<any[]>([]);
+    const [redoStack, setRedoStack] = useState<any[]>([]);
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const roughCanvasRef = useRef<any>(null);
@@ -57,6 +60,28 @@ const DrawingCanvas = () => {
         }
     };
 
+    const undo = () => {
+        if (undoStack.length === 0) return;
+
+        const prevState = undoStack[undoStack.length - 1];
+        setRedoStack([...redoStack, shapes]);
+        setShapes(prevState);
+        setUndoStack(undoStack.slice(0, undoStack.length - 1));
+        clearCanvas();
+        redrawShapes();
+    };
+
+    const redo = () => {
+        if (redoStack.length === 0) return;
+
+        const prevRedoState = redoStack[redoStack.length - 1];
+        setUndoStack([...undoStack, shapes]);
+        setShapes(prevRedoState);
+        setRedoStack(redoStack.slice(0, redoStack.length - 1));
+        clearCanvas();
+        redrawShapes();
+    };
+
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
         // non-null assertion opperator '!', canvas will always be accessible
         // getBoundingClientRect method gets the size of the canvas relative to viewport for mouse accuracy
@@ -74,26 +99,27 @@ const DrawingCanvas = () => {
         const y = event.clientY - rect.top;
 
         if (isDrawing) {
+            let newShape;
             if (currentTool === 'rectangle') {
                 const width = x - startX;
                 const height = y - startY;
-                const newShape = drawRect(startX, startY, width, height);
-                if (newShape) {
-                    setShapes([...shapes, newShape]);
-                }
+                newShape = drawRect(startX, startY, width, height);
+
             } else if (currentTool === 'line') {
-                const newShape = drawLine(startX, startY, x, y);
-                if (newShape) {
-                    setShapes([...shapes, newShape]);
-                }
+                newShape = drawLine(startX, startY, x, y);
+
             } else if (currentTool === 'circle') {
                 // diameter from Euclidean distance formula
                 const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-                const newShape = drawCircle(startX, startY, diameter);
-                if (newShape) {
-                    setShapes([...shapes, newShape]);
-                }
+                newShape = drawCircle(startX, startY, diameter);
             }
+
+            if (newShape) {
+                setShapes([...shapes, newShape]);
+                setUndoStack([...undoStack, shapes]);
+                setRedoStack([]);
+            }
+
             setIsDrawing(false);
         }
     };
@@ -112,14 +138,17 @@ const DrawingCanvas = () => {
             const width = x - startX;
             const height = y - startY;
             const previewShape = drawRect(startX, startY, width, height);
+
             if (roughCanvasRef.current && previewShape) {
                 roughCanvasRef.current.draw(previewShape);
             }
+            
         } else if (currentTool === 'line') {
             const previewShape = drawLine(startX, startY, x, y);
             if (roughCanvasRef.current && previewShape) {
                 roughCanvasRef.current.draw(previewShape);
             }
+
         } else if (currentTool === 'circle') {
             const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
             const previewShape = drawCircle(startX, startY, diameter);
@@ -157,6 +186,8 @@ const DrawingCanvas = () => {
                 onChange={() => selectTool('circle')}
             />
             <label htmlFor='line'>Circle</label>
+            <button onClick={undo}>Undo</button>
+            <button onClick={redo}>Redo</button>
             <canvas
                 ref={canvasRef}
                 id='canvas'
