@@ -1,16 +1,101 @@
 import React, { useState, useLayoutEffect, useRef } from 'react';
 import rough from 'roughjs';
- 
+
 // need: selection tool (with rotation abilities?), undo/redo, pen tool, text tool, eraser, stroke and color options
+
+interface Command {
+    execute(): void;
+    undo(): void;
+}
+
+// Draw Command Classes
+class DrawRectangleCommand implements Command {
+    private rc: any;
+    private x: number;
+    private y: number;
+    private width: number;
+    private height: number;
+    private shapes: any[];
+
+    constructor(rc: any, x: number, y: number, width: number, height: number, shapes: any[]) {
+        this.rc = rc;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.shapes = shapes;
+    }
+
+    execute() {
+        const shape = this.rc.generator.rectangle(this.x, this.y, this.width, this.height);
+        this.shapes.push(shape);
+    }
+
+    undo() {
+        this.shapes.pop();
+    }
+}
+
+class DrawLineCommand implements Command {
+    private rc: any;
+    private x1: number;
+    private y1: number;
+    private x2: number;
+    private y2: number;
+    private shapes: any[];
+
+    constructor(rc: any, x1: number, y1: number, x2: number, y2: number, shapes: any[]) {
+        this.rc = rc;
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+        this.shapes = shapes;
+    }
+
+    execute() {
+        const shape = this.rc.generator.line(this.x1, this.y1, this.x2, this.y2);
+        this.shapes.push(shape);
+    }
+
+    undo() {
+        this.shapes.pop();
+    }
+}
+
+class DrawCircleCommand implements Command {
+    private rc: any;
+    private x: number;
+    private y: number;
+    private diameter: number;
+    private shapes: any[];
+
+    constructor(rc: any, x: number, y: number, diameter: number, shapes: any[]) {
+        this.rc = rc;
+        this.x = x;
+        this.y = y;
+        this.diameter = diameter;
+        this.shapes = shapes;
+    }
+
+    execute() {
+        const shape = this.rc.generator.circle(this.x, this.y, this.diameter);
+        this.shapes.push(shape);
+    }
+
+    undo() {
+        this.shapes.pop();
+    }
+}
+
 const DrawingCanvas = () => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
-    const [shapes, setShapes] = useState<any[]>([]);
+    const [shapes, setShapes] = useState<any[]>([]); // although 'setShapes' value is not directly read, shapes state is used within execute and undo methods within drawing commands
     const [currentTool, setCurrentTool] = useState<'line' | 'rectangle' | 'circle'>('rectangle');
-    
-    const [undoStack, setUndoStack] = useState<any[]>([]);
-    const [redoStack, setRedoStack] = useState<any[]>([]);
+    const [undoStack, setUndoStack] = useState<Command[]>([]);
+    const [redoStack, setRedoStack] = useState<Command[]>([]);
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const roughCanvasRef = useRef<any>(null);
@@ -22,64 +107,42 @@ const DrawingCanvas = () => {
         }
     }, []);
 
-    const drawRect = (x: number, y: number, width: number, height: number) => {
-        const rc = roughCanvasRef.current;
-        if (rc) {
-            return rc.generator.rectangle(x, y, width, height);
-        }
-    };
-
-    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
-        const rc = roughCanvasRef.current;
-        if (rc) {
-            return rc.generator.line(x1, y1, x2, y2);
-        }
-    };
-
-    const drawCircle = (x: number, y: number, diameter: number) => {
-        const rc = roughCanvasRef.current;
-        if (rc) {
-            return rc.generator.circle(x, y, diameter);
-        }
-    }
-
-    const clearCanvas = () => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const context = canvas.getContext('2d');
-            if (context) {
-                context.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        }
-    };
-
-    const redrawShapes = () => {
-        const rc = roughCanvasRef.current;
-        if (rc) {
-            shapes.forEach(shape => rc.draw(shape));
-        }
+    const executeCommand = (command: Command) => {
+        command.execute();
+        setUndoStack(prevUndoStack => [...prevUndoStack, command]);
+        setRedoStack([]); // Clear the redo stack on new action
+        setTimeout(() => {
+            clearCanvas();
+            redrawShapes();
+        }, 0);
     };
 
     const undo = () => {
         if (undoStack.length === 0) return;
 
-        const prevState = undoStack[undoStack.length - 1];
-        setRedoStack([...redoStack, shapes]);
-        setShapes(prevState);
-        setUndoStack(undoStack.slice(0, undoStack.length - 1));
-        clearCanvas();
-        redrawShapes();
+        const command = undoStack.pop();
+        if (command) {
+            command.undo();
+            setRedoStack(prevRedoStack => [...prevRedoStack, command]);
+            setTimeout(() => {
+                clearCanvas();
+                redrawShapes();
+            }, 0);
+        }
     };
 
     const redo = () => {
         if (redoStack.length === 0) return;
 
-        const prevRedoState = redoStack[redoStack.length - 1];
-        setUndoStack([...undoStack, shapes]);
-        setShapes(prevRedoState);
-        setRedoStack(redoStack.slice(0, redoStack.length - 1));
-        clearCanvas();
-        redrawShapes();
+        const command = redoStack.pop();
+        if (command) {
+            command.execute();
+            setUndoStack(prevUndoStack => [...prevUndoStack, command]);
+            setTimeout(() => {
+                clearCanvas();
+                redrawShapes();
+            }, 0);
+        }
     };
 
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -99,25 +162,22 @@ const DrawingCanvas = () => {
         const y = event.clientY - rect.top;
 
         if (isDrawing) {
-            let newShape;
+            let command: Command | null = null;
+
             if (currentTool === 'rectangle') {
                 const width = x - startX;
                 const height = y - startY;
-                newShape = drawRect(startX, startY, width, height);
-
+                command = new DrawRectangleCommand(roughCanvasRef.current, startX, startY, width, height, shapes);
             } else if (currentTool === 'line') {
-                newShape = drawLine(startX, startY, x, y);
-
+                command = new DrawLineCommand(roughCanvasRef.current, startX, startY, x, y, shapes);
             } else if (currentTool === 'circle') {
                 // diameter from Euclidean distance formula
                 const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-                newShape = drawCircle(startX, startY, diameter);
+                command = new DrawCircleCommand(roughCanvasRef.current, startX, startY, diameter, shapes);
             }
 
-            if (newShape) {
-                setShapes([...shapes, newShape]);
-                setUndoStack([...undoStack, shapes]);
-                setRedoStack([]);
+            if (command) {
+                executeCommand(command);
             }
 
             setIsDrawing(false);
@@ -134,32 +194,42 @@ const DrawingCanvas = () => {
         clearCanvas();
         redrawShapes();
 
+        let previewShape;
         if (currentTool === 'rectangle') {
             const width = x - startX;
             const height = y - startY;
-            const previewShape = drawRect(startX, startY, width, height);
-
-            if (roughCanvasRef.current && previewShape) {
-                roughCanvasRef.current.draw(previewShape);
-            }
-            
+            previewShape = roughCanvasRef.current.generator.rectangle(startX, startY, width, height);
         } else if (currentTool === 'line') {
-            const previewShape = drawLine(startX, startY, x, y);
-            if (roughCanvasRef.current && previewShape) {
-                roughCanvasRef.current.draw(previewShape);
-            }
-
+            previewShape = roughCanvasRef.current.generator.line(startX, startY, x, y);
         } else if (currentTool === 'circle') {
             const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-            const previewShape = drawCircle(startX, startY, diameter);
-            if (roughCanvasRef.current && previewShape) {
-                roughCanvasRef.current.draw(previewShape);
-            }
+            previewShape = roughCanvasRef.current.generator.circle(startX, startY, diameter);
+        }
+
+        if (roughCanvasRef.current && previewShape) {
+            roughCanvasRef.current.draw(previewShape);
         }
     };
 
     const selectTool = (tool: 'line' | 'rectangle' | 'circle') => {
         setCurrentTool(tool);
+    };
+
+    const clearCanvas = () => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const context = canvas.getContext('2d');
+            if (context) {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+    };
+
+    const redrawShapes = () => {
+        const rc = roughCanvasRef.current;
+        if (rc) {
+            shapes.forEach(shape => rc.draw(shape));
+        }
     };
 
     return (
@@ -171,22 +241,22 @@ const DrawingCanvas = () => {
                 checked={currentTool === "line"}
                 onChange={() => selectTool('line')}
             />
-            <label htmlFor='line'>Line</label>
+            <label htmlFor='line' className='mr-5'>Line</label>
             <input
                 type='radio'
                 id='rectangle'
                 checked={currentTool === "rectangle"}
                 onChange={() => selectTool('rectangle')}
             />
-            <label htmlFor='rectangle'>Rectangle</label>
+            <label htmlFor='rectangle' className='mr-5'>Rectangle</label>
             <input
                 type='radio'
                 id='circle'
                 checked={currentTool === "circle"}
                 onChange={() => selectTool('circle')}
             />
-            <label htmlFor='line'>Circle</label>
-            <button onClick={undo}>Undo</button>
+            <label htmlFor='circle' className='mr-5'>Circle</label>
+            <button onClick={undo} className='mr-5'>Undo</button>
             <button onClick={redo}>Redo</button>
             <canvas
                 ref={canvasRef}
