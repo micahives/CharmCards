@@ -88,14 +88,44 @@ class DrawCircleCommand implements Command {
     }
 }
 
+class SelectionToolCommand implements Command {
+    private rc: any;
+    private shapes: any[];
+    private selectedShape: any;
+    private initialShapeState: any;
+
+    constructor(rc: any, shapes: any[], selectedShape: any) {
+        this.rc = rc;
+        this.shapes = shapes;
+        this.selectedShape = selectedShape;
+        // Store initial state of the selected shape for undo
+        const index = this.shapes.indexOf(this.selectedShape);
+        if (index !== -1) {
+            this.initialShapeState = { ...this.shapes[index] };
+        }
+    }
+
+    execute() {
+        
+    }
+
+    undo() {
+        const index = this.shapes.indexOf(this.selectedShape);
+        if (index !== -1) {
+            this.shapes[index] = { ...this.initialShapeState };
+        }
+    }
+}
+
 const DrawingCanvas = () => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]); // although 'setShapes' value is not directly read, shapes state is used within execute and undo methods within drawing commands
-    const [currentTool, setCurrentTool] = useState<'line' | 'rectangle' | 'circle'>('rectangle');
+    const [currentTool, setCurrentTool] = useState<'line' | 'rectangle' | 'circle' | 'select'>('rectangle');
     const [undoStack, setUndoStack] = useState<Command[]>([]);
     const [redoStack, setRedoStack] = useState<Command[]>([]);
+    const [selectedShape, setSelectedShape] = useState<any>(null);
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const roughCanvasRef = useRef<any>(null);
@@ -146,6 +176,10 @@ const DrawingCanvas = () => {
     };
 
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas.style.cursor = currentTool === 'select' ? 'move' : 'crosshair';
+        }
         // non-null assertion opperator '!', canvas will always be accessible
         // getBoundingClientRect method gets the size of the canvas relative to viewport for mouse accuracy
         const rect = canvasRef.current!.getBoundingClientRect();
@@ -153,7 +187,16 @@ const DrawingCanvas = () => {
         const y = event.clientY - rect.top;
         setStartX(x);
         setStartY(y);
-        setIsDrawing(true);
+
+        if (currentTool === 'select') {
+            if (selectedShape) {
+                const command = new SelectionToolCommand(roughCanvasRef.current, shapes, selectedShape);
+                setSelectedShape(selectedShape);
+                executeCommand(command);
+            }
+        } else {
+            setIsDrawing(true);
+        }
     };
 
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -182,6 +225,9 @@ const DrawingCanvas = () => {
 
             setIsDrawing(false);
         }
+        if (currentTool === 'select') {
+            setSelectedShape(null); // deselect after moving shape
+        }
     };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -194,24 +240,31 @@ const DrawingCanvas = () => {
         clearCanvas();
         redrawShapes();
 
-        let previewShape;
-        if (currentTool === 'rectangle') {
-            const width = x - startX;
-            const height = y - startY;
-            previewShape = roughCanvasRef.current.generator.rectangle(startX, startY, width, height);
-        } else if (currentTool === 'line') {
-            previewShape = roughCanvasRef.current.generator.line(startX, startY, x, y);
-        } else if (currentTool === 'circle') {
-            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-            previewShape = roughCanvasRef.current.generator.circle(startX, startY, diameter);
-        }
-
-        if (roughCanvasRef.current && previewShape) {
-            roughCanvasRef.current.draw(previewShape);
+        if (currentTool === 'select' && selectedShape) {
+            const command = new SelectionToolCommand(roughCanvasRef.current, shapes, selectedShape);
+            executeCommand(command);
+            setStartX(x);
+            setStartY(y);
+        } else {
+            let previewShape;
+            if (currentTool === 'rectangle') {
+                const width = x - startX;
+                const height = y - startY;
+                previewShape = roughCanvasRef.current.generator.rectangle(startX, startY, width, height);
+            } else if (currentTool === 'line') {
+                previewShape = roughCanvasRef.current.generator.line(startX, startY, x, y);
+            } else if (currentTool === 'circle') {
+                const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+                previewShape = roughCanvasRef.current.generator.circle(startX, startY, diameter);
+            }
+    
+            if (roughCanvasRef.current && previewShape) {
+                roughCanvasRef.current.draw(previewShape);
+            }
         }
     };
 
-    const selectTool = (tool: 'line' | 'rectangle' | 'circle') => {
+    const selectTool = (tool: 'line' | 'rectangle' | 'circle' | 'select') => {
         setCurrentTool(tool);
     };
 
@@ -235,6 +288,13 @@ const DrawingCanvas = () => {
     return (
         <div>
             {/* Radio buttons for canvas tool selection */}
+            <input
+                type='radio'
+                id='select'
+                checked={currentTool === "select"}
+                onChange={() => selectTool('select')}
+            />
+            <label htmlFor='select' className='mr-5'>Select</label>
             <input
                 type='radio'
                 id='line'
