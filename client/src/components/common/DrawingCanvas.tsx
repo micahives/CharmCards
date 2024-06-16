@@ -115,10 +115,23 @@ class SelectionToolCommand implements Command {
             this.shapes[index] = { ...this.initialShapeState };
         }
     }
+
+    move(dx: number, dy: number) {
+        const index = this.shapes.indexOf(this.selectedShape);
+        if (index !== -1) {
+            this.shapes[index].x += dx;
+            this.shapes[index].y += dy;
+            if (this.rc) {
+                this.rc.clear();
+                this.shapes.forEach(shape => this.rc.draw(shape));
+            }
+        }
+    }
 }
 
 const DrawingCanvas = () => {
-    const [isDrawing, setIsDrawing] = useState(false);
+    // consolidate isDrawing and isMoving states into action state
+    const [action, setAction] = useState<'drawing' | 'moving' | 'none'>('none');
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]); // although 'setShapes' value is not directly read, shapes state is used within execute and undo methods within drawing commands
@@ -195,7 +208,7 @@ const DrawingCanvas = () => {
                 executeCommand(command);
             }
         } else {
-            setIsDrawing(true);
+            setAction('drawing');
         }
     };
 
@@ -204,7 +217,7 @@ const DrawingCanvas = () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        if (isDrawing) {
+        if (action === 'drawing') {
             let command: Command | null = null;
 
             if (currentTool === 'rectangle') {
@@ -223,7 +236,7 @@ const DrawingCanvas = () => {
                 executeCommand(command);
             }
 
-            setIsDrawing(false);
+            setAction('none');
         }
         if (currentTool === 'select') {
             setSelectedShape(null); // deselect after moving shape
@@ -231,7 +244,7 @@ const DrawingCanvas = () => {
     };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) return;
+        if (action !== 'drawing') return;
 
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
