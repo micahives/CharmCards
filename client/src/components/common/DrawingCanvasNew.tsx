@@ -1,4 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import rough from 'roughjs';
+import { RoughCanvas } from 'roughjs/bin/canvas';
+import { RoughGenerator } from 'roughjs/bin/generator';
 // need: selection tool (with rotation abilities?), pen tool, text tool, eraser, stroke and color options
 
 const DrawingCanvasNew = () => {
@@ -7,6 +10,8 @@ const DrawingCanvasNew = () => {
     // useRef creates a mutable reference to the canvas element that persists across renders, to directly reference the DOM
     // getElementById ran into timing issues when the 'canvas' element didn't exist in the DOM when the code ran... useRef ensures the reference is updated once element is rendered
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const roughCanvasRef = useRef<RoughCanvas | null>(null);
+    const generatorRef = useRef<RoughGenerator | null>(null);
 
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
@@ -20,25 +25,33 @@ const DrawingCanvasNew = () => {
         console.log(obj?.nested?.value); // 42
         console.log(obj?.nonExistent?.value); // undefined (no error)
          */
-        const ctx = canvas?.getContext('2d');
-
-        if (ctx) {
-            ctx.fillStyle = "green";
-            ctx.fillRect(10, 10, 150, 100);   
+        if (canvas) {
+            roughCanvasRef.current = rough.canvas(canvas);
+            generatorRef.current = roughCanvasRef.current.generator;
         }
     }, []);
 
+    const drawRectangle = () => {
+        const rc = roughCanvasRef.current;
+        const generator = generatorRef.current;
+
+        if (rc && generator) {
+            const rect = generator?.rectangle(100, 100, 200, 200);
+            rc.draw(rect);
+        }
+    }
+
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
 
-    }
+    };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (action === 'none') return;
-    }
+    };
 
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
 
-    }
+    };
 
     const selectTool = (tool: 'line' | 'rectangle' | 'circle' | 'select') => {
         setTool(tool);
