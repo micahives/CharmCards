@@ -6,7 +6,13 @@ import { RoughGenerator } from 'roughjs/bin/generator';
 
 const DrawingCanvasNew = () => {
     const [tool, setTool] = useState('rectangle');
-    const [action, setAction] = useState<'drawing' | 'none'>('none');
+    const [action, setAction] = useState<'drawing' | 'moving' | 'none'>('none');
+    // x and y coordinate states
+    const [startX, setStartX] = useState(0);
+    const [startY, setStartY] = useState(0);
+    // keep track of shapes on the canvas
+    const [shapes, setShapes] = useState<any[]>([]);
+
     // useRef creates a mutable reference to the canvas element that persists across renders, to directly reference the DOM
     // getElementById ran into timing issues when the 'canvas' element didn't exist in the DOM when the code ran... useRef ensures the reference is updated once element is rendered
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -16,41 +22,73 @@ const DrawingCanvasNew = () => {
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
         // '?' is the optional chaining operator, to access potentially null values
-        /**
-         const obj = {
-            nested: {
-                value: 42
-            }
-        };
-        console.log(obj?.nested?.value); // 42
-        console.log(obj?.nonExistent?.value); // undefined (no error)
-         */
         if (canvas) {
             roughCanvasRef.current = rough.canvas(canvas);
             generatorRef.current = roughCanvasRef.current.generator;
         }
     }, []);
 
-    const drawRectangle = () => {
+    const drawRectangle = (x: number, y: number, width: number, height: number) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
 
         if (rc && generator) {
-            const rect = generator?.rectangle(100, 100, 200, 200);
+            const rect = generator?.rectangle(x, y, width, height);
             rc.draw(rect);
+            setShapes(prevShapes => [...prevShapes, rect]);
         }
-    }
+    };
 
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+        setAction('drawing');
 
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas.style.cursor = tool === 'select' ? 'move' : 'crosshair';
+        }
+
+        // account for canvas offset, set x and y coordinates for starting point of drawable object (rect/line/circle)
+        const rect = canvasRef.current!.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        setStartX(x);
+        setStartY(y);
     };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (action === 'none') return;
+
+        const rect = canvasRef.current!.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        clearCanvas();
+        redrawShapes();
+
+        let previewShape;
+        if (tool === 'rectangle') {
+            const width = x - startX;
+            const height = y - startY;
+            previewShape = roughCanvasRef.current!.generator.rectangle(startX, startY, width, height);
+        }
+
+        if (roughCanvasRef.current && previewShape) {
+            roughCanvasRef.current.draw(previewShape);
+        }
     };
 
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
+        setAction('none');
 
+        const rect = canvasRef.current!.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        if (tool === 'rectangle') {
+            const width = x - startX;
+            const height = y - startY;
+            drawRectangle(startX, startY, width, height);
+        }
     };
 
     const selectTool = (tool: 'line' | 'rectangle' | 'circle' | 'select') => {
@@ -64,6 +102,13 @@ const DrawingCanvasNew = () => {
             if (context) {
                 context.clearRect(0, 0, canvas.width, canvas.height);
             }
+        }
+    };
+
+    const redrawShapes = () => {
+        const rc = roughCanvasRef.current;
+        if (rc) {
+            shapes.forEach(shape => rc.draw(shape));
         }
     };
 
