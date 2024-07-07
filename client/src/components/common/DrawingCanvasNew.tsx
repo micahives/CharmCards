@@ -12,8 +12,9 @@ const DrawingCanvasNew = () => {
     // x and y coordinate states
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
-    // keep track of shapes on the canvas
     const [shapes, setShapes] = useState<any[]>([]);
+    const [undoStack, setUndoStack] = useState<any[]>([]);
+    const [redoStack, setRedoStack] = useState<any[]>([]);
 
     // useRef creates a mutable reference to the canvas element that persists across renders, to directly reference the DOM
     // getElementById ran into timing issues when the 'canvas' element didn't exist in the DOM when the code ran... useRef ensures the reference is updated once element is rendered
@@ -41,7 +42,10 @@ const DrawingCanvasNew = () => {
         if (rc && generator) {
             const line = generator?.line(x1, y1, x2, y2);
             rc.draw(line);
-            setShapes(prevShapes => [...prevShapes, { id, type, x1, y1, x2, y2, shape: line }]);
+            const newShape = { id, type, x1, y1, x2, y2, shape: line }
+            setShapes(prevShapes => [...prevShapes, newShape]);
+            setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
+            setRedoStack([]); // clear redo stack on new action
         }
     };
 
@@ -54,7 +58,11 @@ const DrawingCanvasNew = () => {
         if (rc && generator) {
             const rect = generator?.rectangle(x, y, width, height);
             rc.draw(rect);
-            setShapes(prevShapes => [...prevShapes, { id, type, x, y, width, height, shape: rect }]);
+            setShapes(prevShapes => [...prevShapes, newShape]);
+            const newShape = { id, type, x, y, width, height, shape: rect }
+            setShapes(prevShapes => [...prevShapes, newShape]);
+            setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
+            setRedoStack([]);
         }
     };
 
@@ -67,7 +75,10 @@ const DrawingCanvasNew = () => {
         if (rc && generator) {
             const circle = generator?.circle(x, y, diameter);
             rc.draw(circle);
-            setShapes(prevShapes => [...prevShapes, { id, type, x, y, diameter, shape: circle }]);
+            const newShape = { id, type, x, y, diameter, shape: circle }
+            setShapes(prevShapes => [...prevShapes, newShape]);
+            setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
+            setRedoStack([]);
         }
     };
 
@@ -162,6 +173,26 @@ const DrawingCanvasNew = () => {
         }
     };
 
+    const undo = () => {
+       const lastShape = shapes.pop();
+       if (lastShape) {
+        setRedoStack(prevRedoStack => [...prevRedoStack, lastShape]);
+        setShapes([...shapes]);
+        clearCanvas();
+        redrawShapes();
+       }
+    };
+
+    const redo = () => {
+        const lastUndoneShape = redoStack.pop();
+        if (lastUndoneShape) {
+            setShapes(prevShapes => [...prevShapes, lastUndoneShape]);
+            setUndoStack(prevUndoStack => [...prevUndoStack, lastUndoneShape]);
+            clearCanvas();
+            redrawShapes();
+        }
+    };
+
     return (
         <div>
             <input
@@ -192,6 +223,8 @@ const DrawingCanvasNew = () => {
                 onChange={() => selectTool('circle')}
             />
             <label htmlFor='circle' className='mr-5'>Circle</label>
+            <button className='mr-5' onClick={undo}>Undo</button>
+            <button onClick={redo}>Redo</button>
 
             <canvas
                 id='canvas'
