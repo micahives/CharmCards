@@ -21,12 +21,23 @@ const DrawingCanvasNew = () => {
 
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
-        // '?' is the optional chaining operator, to access potentially null values
         if (canvas) {
             roughCanvasRef.current = rough.canvas(canvas);
             generatorRef.current = roughCanvasRef.current.generator;
         }
     }, []);
+
+    // draws line from (x1, y1) to (x2, y2)
+    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+        const rc = roughCanvasRef.current;
+        const generator = generatorRef.current;
+
+        if (rc && generator) {
+            const line = generator?.line(x1, y1, x2, y2);
+            rc.draw(line);
+            setShapes(prevShapes => [...prevShapes, line]);
+        }
+    };
 
     const drawRectangle = (x: number, y: number, width: number, height: number) => {
         const rc = roughCanvasRef.current;
@@ -56,8 +67,7 @@ const DrawingCanvasNew = () => {
     };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        if (action === 'none') return;
-
+        if (action !== 'drawing') return;
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -70,6 +80,8 @@ const DrawingCanvasNew = () => {
             const width = x - startX;
             const height = y - startY;
             previewShape = roughCanvasRef.current!.generator.rectangle(startX, startY, width, height);
+        } else if (tool === 'line') {
+            previewShape = roughCanvasRef.current!.generator.line(startX, startY, x, y);
         }
 
         if (roughCanvasRef.current && previewShape) {
@@ -88,6 +100,8 @@ const DrawingCanvasNew = () => {
             const width = x - startX;
             const height = y - startY;
             drawRectangle(startX, startY, width, height);
+        } else if (tool === 'line') {
+            drawLine(startX, startY, x, y);
         }
     };
 
