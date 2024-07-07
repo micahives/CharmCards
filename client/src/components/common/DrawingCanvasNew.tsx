@@ -2,7 +2,9 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
-// need: selection tool (with rotation abilities?), pen tool, text tool, eraser, stroke and color options
+import { v4 as uuidv4 } from 'uuid';
+
+// need: selection tool (with rotation abilities?), pen tool, text tool, eraser, stroke and color options, undo/redo
 
 const DrawingCanvasNew = () => {
     const [tool, setTool] = useState('rectangle');
@@ -19,6 +21,9 @@ const DrawingCanvasNew = () => {
     const roughCanvasRef = useRef<RoughCanvas | null>(null);
     const generatorRef = useRef<RoughGenerator | null>(null);
 
+    // reference to the preview shape drawn on handleMouseMove
+    const previewShapeRef = useRef<any>(null);
+
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -27,36 +32,42 @@ const DrawingCanvasNew = () => {
         }
     }, []);
 
-    const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+    const drawLine = (x1: number, y1: number, x2: number, y2: number, type?: string) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
+        const id = uuidv4();
+        type = 'line';
 
         if (rc && generator) {
             const line = generator?.line(x1, y1, x2, y2);
             rc.draw(line);
-            setShapes(prevShapes => [...prevShapes, line]);
+            setShapes(prevShapes => [...prevShapes, { id, type, x1, y1, x2, y2, shape: line }]);
         }
     };
 
-    const drawRectangle = (x: number, y: number, width: number, height: number) => {
+    const drawRectangle = (x: number, y: number, width: number, height: number, type?: string) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
+        const id = uuidv4();
+        type = 'rectangle';
 
         if (rc && generator) {
             const rect = generator?.rectangle(x, y, width, height);
             rc.draw(rect);
-            setShapes(prevShapes => [...prevShapes, rect]);
+            setShapes(prevShapes => [...prevShapes, { id, type, x, y, width, height, shape: rect }]);
         }
     };
 
-    const drawCircle = (x: number, y: number, diameter: number) => {
+    const drawCircle = (x: number, y: number, diameter: number, type?: string) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
+        const id = uuidv4();
+        type = 'circle';
 
         if (rc && generator) {
-            const rect = generator?.circle(x, y, diameter);
-            rc.draw(rect);
-            setShapes(prevShapes => [...prevShapes, rect]);
+            const circle = generator?.circle(x, y, diameter);
+            rc.draw(circle);
+            setShapes(prevShapes => [...prevShapes, { id, type, x, y, diameter, shape: circle }]);
         }
     };
 
@@ -99,11 +110,19 @@ const DrawingCanvasNew = () => {
 
         if (roughCanvasRef.current && previewShape) {
             roughCanvasRef.current.draw(previewShape);
+            previewShapeRef.current = previewShape; // establish reference to the preview shape to be cleared on handleMouseUp
         }
     };
 
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
         setAction('none');
+
+        // clear the preview shape from handleMouseMove
+        if (previewShapeRef.current) {
+            clearCanvas();
+            redrawShapes();
+            previewShapeRef.current = null;
+        };
 
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
@@ -138,7 +157,8 @@ const DrawingCanvasNew = () => {
     const redrawShapes = () => {
         const rc = roughCanvasRef.current;
         if (rc) {
-            shapes.forEach(shape => rc.draw(shape));
+            // shape property within the generated Rough.js shape object
+            shapes.forEach(shape => rc.draw(shape.shape));
         }
     };
 
