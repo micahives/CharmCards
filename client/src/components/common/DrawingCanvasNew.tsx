@@ -27,7 +27,6 @@ const DrawingCanvasNew = () => {
         }
     }, []);
 
-    // draws line from (x1, y1) to (x2, y2)
     const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
@@ -45,6 +44,17 @@ const DrawingCanvasNew = () => {
 
         if (rc && generator) {
             const rect = generator?.rectangle(x, y, width, height);
+            rc.draw(rect);
+            setShapes(prevShapes => [...prevShapes, rect]);
+        }
+    };
+
+    const drawCircle = (x: number, y: number, diameter: number) => {
+        const rc = roughCanvasRef.current;
+        const generator = generatorRef.current;
+
+        if (rc && generator) {
+            const rect = generator?.circle(x, y, diameter);
             rc.draw(rect);
             setShapes(prevShapes => [...prevShapes, rect]);
         }
@@ -82,6 +92,9 @@ const DrawingCanvasNew = () => {
             previewShape = roughCanvasRef.current!.generator.rectangle(startX, startY, width, height);
         } else if (tool === 'line') {
             previewShape = roughCanvasRef.current!.generator.line(startX, startY, x, y);
+        } else if (tool === 'circle') {
+            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+            previewShape = roughCanvasRef.current!.generator.circle(startX, startY, diameter)
         }
 
         if (roughCanvasRef.current && previewShape) {
@@ -102,6 +115,9 @@ const DrawingCanvasNew = () => {
             drawRectangle(startX, startY, width, height);
         } else if (tool === 'line') {
             drawLine(startX, startY, x, y);
+        } else if (tool === 'circle') {
+            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+            drawCircle(startX, startY, diameter);
         }
     };
 
