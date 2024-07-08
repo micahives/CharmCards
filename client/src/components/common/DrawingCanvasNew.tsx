@@ -33,49 +33,30 @@ const DrawingCanvasNew = () => {
         }
     }, []);
 
-    const drawLine = (x1: number, y1: number, x2: number, y2: number, type?: string) => {
+    const drawShape = (type: string, x1: number, y1: number, x2: number, y2: number) => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
         const id = uuidv4();
-        type = 'line';
+        let shape;
 
         if (rc && generator) {
-            const line = generator?.line(x1, y1, x2, y2);
-            rc.draw(line);
-            const newShape = { id, type, x1, y1, x2, y2, shape: line }
-            setShapes(prevShapes => [...prevShapes, newShape]);
-            setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
-            setRedoStack([]); // clear redo stack on new action
-        }
-    };
+            switch (type) {
+                case 'line':
+                    shape = generator.line(x1, y1, x2, y2);
+                    break;
+                case 'rectangle':
+                    shape = generator.rectangle(x1, y1, x2 - x1, y2 - y1);
+                    break;
+                case 'circle':
+                    const diameter = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) * 2;
+                    shape = generator.circle(x1, y1, diameter);
+                    break;
+                default:
+                    return;
+            }
 
-    const drawRectangle = (x: number, y: number, width: number, height: number, type?: string) => {
-        const rc = roughCanvasRef.current;
-        const generator = generatorRef.current;
-        const id = uuidv4();
-        type = 'rectangle';
-
-        if (rc && generator) {
-            const rect = generator?.rectangle(x, y, width, height);
-            rc.draw(rect);
-            setShapes(prevShapes => [...prevShapes, newShape]);
-            const newShape = { id, type, x, y, width, height, shape: rect }
-            setShapes(prevShapes => [...prevShapes, newShape]);
-            setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
-            setRedoStack([]);
-        }
-    };
-
-    const drawCircle = (x: number, y: number, diameter: number, type?: string) => {
-        const rc = roughCanvasRef.current;
-        const generator = generatorRef.current;
-        const id = uuidv4();
-        type = 'circle';
-
-        if (rc && generator) {
-            const circle = generator?.circle(x, y, diameter);
-            rc.draw(circle);
-            const newShape = { id, type, x, y, diameter, shape: circle }
+            rc.draw(shape);
+            const newShape = { id, type, x1, y1, x2, y2, shape };
             setShapes(prevShapes => [...prevShapes, newShape]);
             setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
             setRedoStack([]);
@@ -128,7 +109,6 @@ const DrawingCanvasNew = () => {
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
         setAction('none');
 
-        // clear the preview shape from handleMouseMove
         if (previewShapeRef.current) {
             clearCanvas();
             redrawShapes();
@@ -139,16 +119,7 @@ const DrawingCanvasNew = () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        if (tool === 'rectangle') {
-            const width = x - startX;
-            const height = y - startY;
-            drawRectangle(startX, startY, width, height);
-        } else if (tool === 'line') {
-            drawLine(startX, startY, x, y);
-        } else if (tool === 'circle') {
-            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-            drawCircle(startX, startY, diameter);
-        }
+        drawShape(tool, startX, startY, x, y);
     };
 
     const selectTool = (tool: 'line' | 'rectangle' | 'circle' | 'select') => {
