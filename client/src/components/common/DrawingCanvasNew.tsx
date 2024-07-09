@@ -6,6 +6,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 // need: selection tool (with rotation abilities?), pen tool, text tool, eraser, stroke and color options, undo/redo
 
+interface Shape {
+    id: string;
+    type: 'line' | 'rectangle' | 'circle';
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    shape: any; // rough.js shape object
+}
+
 const DrawingCanvasNew = () => {
     const [tool, setTool] = useState('rectangle');
     const [action, setAction] = useState<'drawing' | 'moving' | 'none'>('none');
@@ -63,46 +73,77 @@ const DrawingCanvasNew = () => {
         }
     };
 
-    const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        setAction('drawing');
-
-        const canvas = canvasRef.current;
-        if (canvas) {
-            canvas.style.cursor = tool === 'select' ? 'move' : 'crosshair';
+    const isWithinShape = (x: number, y: number, shape: Shape): boolean => {
+        const { type, x1, y1, x2, y2 } = shape;
+        switch (type) {
+            case 'rectangle':
+                return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+            case 'line':
+                // check if point is near the line segment
+                const distance = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) /
+                                 Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2));
+                return distance <= 5; // may be adjusted
+            case 'circle':
+                // check if point is near the circle radius
+                const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                const dist = Math.sqrt(Math.pow(x - x1, 2) + Math.pow(y - y1, 2));
+                return dist <= radius;
+            default:
+                return false;
         }
+    };
 
-        // account for canvas offset, set x and y coordinates for starting point of drawable object (rect/line/circle)
+    const getShapeAtPosition = (x: number, y: number, shapes: Shape[]): Shape | undefined => {
+        return shapes.find(shape => isWithinShape(x, y, shape));
+    };
+
+    const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        setStartX(x);
-        setStartY(y);
+        if (tool === 'select') {
+            const shape = getShapeAtPosition(x, y, shapes); 
+            if (shape) {
+                setAction('moving');
+            }
+        } else {
+            const canvas = canvasRef.current;
+            if (canvas) {
+                canvas.style.cursor = tool === 'select' ? 'move' : 'crosshair';
+            }
+    
+            // account for canvas offset, set x and y coordinates for starting point of drawable object (rect/line/circle)
+            setStartX(x);
+            setStartY(y);
+            setAction('drawing');
+        }
     };
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        if (action !== 'drawing') return;
-        const rect = canvasRef.current!.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        clearCanvas();
-        redrawShapes();
-
-        let previewShape;
-        if (tool === 'rectangle') {
-            const width = x - startX;
-            const height = y - startY;
-            previewShape = roughCanvasRef.current!.generator.rectangle(startX, startY, width, height);
-        } else if (tool === 'line') {
-            previewShape = roughCanvasRef.current!.generator.line(startX, startY, x, y);
-        } else if (tool === 'circle') {
-            const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-            previewShape = roughCanvasRef.current!.generator.circle(startX, startY, diameter)
-        }
-
-        if (roughCanvasRef.current && previewShape) {
-            roughCanvasRef.current.draw(previewShape);
-            previewShapeRef.current = previewShape; // establish reference to the preview shape to be cleared on handleMouseUp
+        if (action === 'drawing') {
+            const rect = canvasRef.current!.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+    
+            clearCanvas();
+            redrawShapes();
+    
+            let previewShape;
+            if (tool === 'rectangle') {
+                const width = x - startX;
+                const height = y - startY;
+                previewShape = roughCanvasRef.current!.generator.rectangle(startX, startY, width, height);
+            } else if (tool === 'line') {
+                previewShape = roughCanvasRef.current!.generator.line(startX, startY, x, y);
+            } else if (tool === 'circle') {
+                const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
+                previewShape = roughCanvasRef.current!.generator.circle(startX, startY, diameter)
+            }
+    
+            if (roughCanvasRef.current && previewShape) {
+                roughCanvasRef.current.draw(previewShape);
+                previewShapeRef.current = previewShape; // establish reference to the preview shape to be cleared on handleMouseUp
+            }
         }
     };
 
