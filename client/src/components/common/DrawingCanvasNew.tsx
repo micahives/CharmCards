@@ -4,7 +4,7 @@ import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
 
-// need: selection tool (with rotation abilities?), pen tool, text tool, eraser, stroke and color options, undo/redo
+// need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
 
 interface Shape {
     id: string;
@@ -23,8 +23,11 @@ const DrawingCanvasNew = () => {
     const [startX, setStartX] = useState(0);
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
+
     const [undoStack, setUndoStack] = useState<any[]>([]);
     const [redoStack, setRedoStack] = useState<any[]>([]);
+
+    const [selectedShape, setSelectedShape] = useState<any>(null);
 
     // useRef creates a mutable reference to the canvas element that persists across renders, to directly reference the DOM
     // getElementById ran into timing issues when the 'canvas' element didn't exist in the DOM when the code ran... useRef ensures the reference is updated once element is rendered
@@ -104,7 +107,10 @@ const DrawingCanvasNew = () => {
         if (tool === 'select') {
             const shape = getShapeAtPosition(x, y, shapes); 
             if (shape) {
+                setSelectedShape(shape);
                 setAction('moving');
+                setStartX(x);
+                setStartY(y);
             }
         } else {
             const canvas = canvasRef.current;
@@ -137,31 +143,66 @@ const DrawingCanvasNew = () => {
                 previewShape = roughCanvasRef.current!.generator.line(startX, startY, x, y);
             } else if (tool === 'circle') {
                 const diameter = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) * 2;
-                previewShape = roughCanvasRef.current!.generator.circle(startX, startY, diameter)
+                previewShape = roughCanvasRef.current!.generator.circle(startX, startY, diameter);
             }
     
             if (roughCanvasRef.current && previewShape) {
                 roughCanvasRef.current.draw(previewShape);
                 previewShapeRef.current = previewShape; // establish reference to the preview shape to be cleared on handleMouseUp
             }
-        }
-    };
-
-    const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        setAction('none');
-
-        if (previewShapeRef.current) {
+        } else if (action === 'moving' && selectedShape) {
+            const rect = canvasRef.current!.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+    
+            // calculate the offset for the first move
+            const offsetX = x - startX;
+            const offsetY = y - startY;
+    
+            // destructure and update the selected shape's coordinates
+            const updatedShape = {
+                ...selectedShape,
+                x1: selectedShape.x1 + offsetX,
+                y1: selectedShape.y1 + offsetY,
+                x2: selectedShape.x2 + offsetX,
+                y2: selectedShape.y2 + offsetY,
+                shape: regenerateShape(selectedShape.type, selectedShape.x1 + offsetX, selectedShape.y1 + offsetY, selectedShape.x2 + offsetX, selectedShape.y2 + offsetY)
+            };
+    
+            // update the shapes state with new coordinates
+            setShapes(prevShapes =>
+                prevShapes.map(shape => (shape.id === selectedShape.id ? updatedShape : shape))
+            );
+    
+            setSelectedShape(updatedShape);
+            setStartX(x);
+            setStartY(y);
+    
             clearCanvas();
             redrawShapes();
-            previewShapeRef.current = null;
-        };
-
-        const rect = canvasRef.current!.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        drawShape(tool, startX, startY, x, y);
+        }
     };
+    
+    const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
+        if (action === 'drawing') {
+            setAction('none');
+    
+            if (previewShapeRef.current) {
+                clearCanvas();
+                redrawShapes();
+                previewShapeRef.current = null;
+            }
+    
+            const rect = canvasRef.current!.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+    
+            drawShape(tool, startX, startY, x, y);
+        } else if (action === 'moving') {
+            setAction('none');
+            setSelectedShape(null);
+        }
+    };    
 
     const selectTool = (tool: 'line' | 'rectangle' | 'circle' | 'select') => {
         setTool(tool);
@@ -183,6 +224,30 @@ const DrawingCanvasNew = () => {
             // shape property within the generated Rough.js shape object
             shapes.forEach(shape => rc.draw(shape.shape));
         }
+    };
+
+    // creates a new roughjs shape object based on updated coordinates after shape movement
+    const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number) => {
+        const generator = generatorRef.current;
+        let shape;
+
+        if (generator) {
+            switch (type) {
+                case 'line':
+                    shape = generator.line(x1, y1, x2, y2);
+                    break;
+                case 'rectangle':
+                    shape = generator.rectangle(x1, y1, x2 - x1, y2 - y1);
+                    break;
+                case 'circle':
+                    const diameter = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) * 2;
+                    shape = generator.circle(x1, y1, diameter);
+                    break;
+                default:
+                    return null;
+            }
+        }
+        return shape;
     };
 
     const undo = () => {
