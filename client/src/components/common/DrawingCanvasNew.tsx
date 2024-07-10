@@ -110,6 +110,8 @@ const DrawingCanvasNew = () => {
                 setAction('moving');
                 setStartX(x);
                 setStartY(y);
+                clearCanvas();
+                redrawShapes();
             }
         } else {
             // account for canvas offset, set x and y coordinates for starting point of drawable object (rect/line/circle)
@@ -221,37 +223,71 @@ const DrawingCanvasNew = () => {
         if (rc) {
             shapes.forEach(shape => {
                 rc.draw(shape.shape);
-                if (shape === selectedShape) {
-                    drawHighlight(shape);
-                }
             });
+            if (selectedShape && tool === 'select') {
+                drawHighlight(selectedShape);
+            }
         }
-    };
+    };    
 
     const drawHighlight = (shape: Shape) => {
         const context = canvasRef.current!.getContext('2d');
         if (!context) return;
-
+    
         context.save();
-        context.strokeStyle = 'blue';
+        context.strokeStyle = '#b7b5ed';
         context.lineWidth = 2;
-
+    
+        const offset = 4; // slight offset for the highlight
+    
         if (shape.type === 'rectangle') {
-            context.strokeRect(shape.x1, shape.y1, shape.x2 - shape.x1, shape.y2 - shape.y1);
+            context.strokeRect(shape.x1 - offset, shape.y1 - offset, (shape.x2 - shape.x1) + 2 * offset, (shape.y2 - shape.y1) + 2 * offset);
+            drawNodes(context, shape.x1 - offset, shape.y1 - offset, shape.x2 + offset, shape.y2 + offset);
         } else if (shape.type === 'circle') {
             const radius = Math.sqrt(Math.pow(shape.x2 - shape.x1, 2) + Math.pow(shape.y2 - shape.y1, 2));
             context.beginPath();
-            context.arc(shape.x1, shape.y1, radius, 0, 2 * Math.PI);
+            context.arc(shape.x1, shape.y1, radius + offset, 0, 2 * Math.PI);
             context.stroke();
+            drawNodes(context, shape.x1 - radius - offset, shape.y1 - radius - offset, shape.x1 + radius + offset, shape.y1 + radius + offset);
         } else if (shape.type === 'line') {
             context.beginPath();
             context.moveTo(shape.x1, shape.y1);
             context.lineTo(shape.x2, shape.y2);
             context.stroke();
+            drawNodes(context, shape.x1, shape.y1, shape.x2, shape.y2);
         }
-
+    
         context.restore();
     };
+    
+    const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+        const nodeSize = 8;
+        const halfNodeSize = nodeSize / 2;
+        const radius = 2; // radius for rounded corners
+        
+        const nodes = [
+            { x: x1, y: y1 },
+            { x: x2, y: y1 },
+            { x: x1, y: y2 },
+            { x: x2, y: y2 }
+        ];
+    
+        context.strokeStyle = '#b7b5ed';
+        context.fillStyle = 'white';
+        context.lineWidth = 2;
+    
+        nodes.forEach(node => {
+            context.beginPath();
+            context.moveTo(node.x - halfNodeSize + radius, node.y - halfNodeSize);
+            context.arcTo(node.x + halfNodeSize, node.y - halfNodeSize, node.x + halfNodeSize, node.y + halfNodeSize, radius);
+            context.arcTo(node.x + halfNodeSize, node.y + halfNodeSize, node.x - halfNodeSize, node.y + halfNodeSize, radius);
+            context.arcTo(node.x - halfNodeSize, node.y + halfNodeSize, node.x - halfNodeSize, node.y - halfNodeSize, radius);
+            context.arcTo(node.x - halfNodeSize, node.y - halfNodeSize, node.x + halfNodeSize, node.y - halfNodeSize, radius);
+            context.closePath();
+            context.fill();
+            context.stroke();
+        });
+    };    
 
     // creates a new roughjs shape object based on updated coordinates after shape movement
     const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number) => {
