@@ -3,28 +3,20 @@ import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
+import { getShapeAtPosition, drawHighlight, calculateRotationAngle, applyRotation } from '../../utils/canvasHelpers';
 
 // need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
 
-interface Shape {
-    id: string;
-    type: 'line' | 'rectangle' | 'circle';
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-    shape: any; // rough.js shape object
-}
-
 const DrawingCanvasNew = () => {
     const [tool, setTool] = useState('rectangle');
-    const [action, setAction] = useState<'drawing' | 'moving' | 'none'>('none');
+    const [action, setAction] = useState<'drawing' | 'moving' | 'rotating' | 'resizing' | 'none'>('none');
     const [startX, setStartX] = useState(0); // x and y coordinate states
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
     const [undoStack, setUndoStack] = useState<any[]>([]);
     const [redoStack, setRedoStack] = useState<any[]>([]);
     const [selectedShape, setSelectedShape] = useState<any>(null);
+    const [selectedNode, setSelectedNode] = useState<any>(null);
 
     // useRef creates a mutable reference to the canvas element that persists across renders, to directly reference the DOM
     // getElementById ran into timing issues when the 'canvas' element didn't exist in the DOM when the code ran... useRef ensures the reference is updated once element is rendered
@@ -69,30 +61,6 @@ const DrawingCanvasNew = () => {
             setUndoStack(prevUndoStack => [...prevUndoStack, newShape]);
             setRedoStack([]);
         }
-    };
-
-    const isWithinShape = (x: number, y: number, shape: Shape): boolean => {
-        const { type, x1, y1, x2, y2 } = shape;
-        switch (type) {
-            case 'rectangle':
-                return x >= x1 && x <= x2 && y >= y1 && y <= y2;
-            case 'line':
-                // check if point is near the line segment
-                const distance = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) /
-                                 Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2));
-                return distance <= 5; // may be adjusted
-            case 'circle':
-                // check if point is near the circle radius
-                const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                const dist = Math.sqrt(Math.pow(x - x1, 2) + Math.pow(y - y1, 2));
-                return dist <= radius;
-            default:
-                return false;
-        }
-    };
-
-    const getShapeAtPosition = (x: number, y: number, shapes: Shape[]): Shape | undefined => {
-        return shapes.find(shape => isWithinShape(x, y, shape));
     };
 
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -152,14 +120,12 @@ const DrawingCanvasNew = () => {
     
             if (roughCanvasRef.current && previewShape) {
                 roughCanvasRef.current.draw(previewShape);
-                previewShapeRef.current = previewShape; // establish reference to the preview shape to be cleared on handleMouseUp
+                previewShapeRef.current = previewShape;
             }
         } else if (action === 'moving' && selectedShape) {
-            // calculate the offset for the first move
             const offsetX = x - startX;
             const offsetY = y - startY;
     
-            // destructure and update the selected shape's coordinates
             const updatedShape = {
                 ...selectedShape,
                 x1: selectedShape.x1 + offsetX,
@@ -169,7 +135,6 @@ const DrawingCanvasNew = () => {
                 shape: regenerateShape(selectedShape.type, selectedShape.x1 + offsetX, selectedShape.y1 + offsetY, selectedShape.x2 + offsetX, selectedShape.y2 + offsetY)
             };
     
-            // update the shapes state with new coordinates
             setShapes(prevShapes =>
                 prevShapes.map(shape => (shape.id === selectedShape.id ? updatedShape : shape))
             );
@@ -180,8 +145,33 @@ const DrawingCanvasNew = () => {
     
             clearCanvas();
             redrawShapes();
+        } else if (action === 'resizing' && selectedShape) {
+            const updatedShape = {
+                ...selectedShape,
+                [selectedNode.key]: selectedNode.key === 'x1' || selectedNode.key === 'x2' ? x : y,
+                shape: regenerateShape(selectedShape.type, selectedShape.x1, selectedShape.y1, selectedShape.x2, selectedShape.y2)
+            };
+    
+            setShapes(prevShapes =>
+                prevShapes.map(shape => (shape.id === selectedShape.id ? updatedShape : shape))
+            );
+    
+            setSelectedShape(updatedShape);
+            clearCanvas();
+            redrawShapes();
+        } else if (action === 'rotating' && selectedShape) {
+            const angle = calculateRotationAngle(startX, startY, x, y, selectedShape);
+            const rotatedShape = applyRotation(selectedShape, angle, roughCanvasRef.current!.generator);
+    
+            setShapes(prevShapes =>
+                prevShapes.map(shape => (shape.id === selectedShape.id ? rotatedShape : shape))
+            );
+    
+            setSelectedShape(rotatedShape);
+            clearCanvas();
+            redrawShapes();
         }
-    };
+    };    
     
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (action === 'drawing') {
@@ -220,75 +210,17 @@ const DrawingCanvasNew = () => {
 
     const redrawShapes = () => {
         const rc = roughCanvasRef.current;
-        if (rc) {
+        const canvas = canvasRef.current;
+        if (rc && canvas) {
             shapes.forEach(shape => {
                 rc.draw(shape.shape);
             });
             if (selectedShape && tool === 'select') {
-                drawHighlight(selectedShape);
+                drawHighlight(canvas, selectedShape);
             }
         }
-    };    
-
-    const drawHighlight = (shape: Shape) => {
-        const context = canvasRef.current!.getContext('2d');
-        if (!context) return;
-    
-        context.save();
-        context.strokeStyle = '#b7b5ed';
-        context.lineWidth = 2;
-    
-        const offset = 4; // slight offset for the highlight
-    
-        if (shape.type === 'rectangle') {
-            context.strokeRect(shape.x1 - offset, shape.y1 - offset, (shape.x2 - shape.x1) + 2 * offset, (shape.y2 - shape.y1) + 2 * offset);
-            drawNodes(context, shape.x1 - offset, shape.y1 - offset, shape.x2 + offset, shape.y2 + offset);
-        } else if (shape.type === 'circle') {
-            const radius = Math.sqrt(Math.pow(shape.x2 - shape.x1, 2) + Math.pow(shape.y2 - shape.y1, 2));
-            context.beginPath();
-            context.arc(shape.x1, shape.y1, radius + offset, 0, 2 * Math.PI);
-            context.stroke();
-            drawNodes(context, shape.x1 - radius - offset, shape.y1 - radius - offset, shape.x1 + radius + offset, shape.y1 + radius + offset);
-        } else if (shape.type === 'line') {
-            context.beginPath();
-            context.moveTo(shape.x1, shape.y1);
-            context.lineTo(shape.x2, shape.y2);
-            context.stroke();
-            drawNodes(context, shape.x1, shape.y1, shape.x2, shape.y2);
-        }
-    
-        context.restore();
     };
-    
-    const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-        const nodeSize = 8;
-        const halfNodeSize = nodeSize / 2;
-        const radius = 2; // radius for rounded corners
-        
-        const nodes = [
-            { x: x1, y: y1 },
-            { x: x2, y: y1 },
-            { x: x1, y: y2 },
-            { x: x2, y: y2 }
-        ];
-    
-        context.strokeStyle = '#b7b5ed';
-        context.fillStyle = 'white';
-        context.lineWidth = 2;
-    
-        nodes.forEach(node => {
-            context.beginPath();
-            context.moveTo(node.x - halfNodeSize + radius, node.y - halfNodeSize);
-            context.arcTo(node.x + halfNodeSize, node.y - halfNodeSize, node.x + halfNodeSize, node.y + halfNodeSize, radius);
-            context.arcTo(node.x + halfNodeSize, node.y + halfNodeSize, node.x - halfNodeSize, node.y + halfNodeSize, radius);
-            context.arcTo(node.x - halfNodeSize, node.y + halfNodeSize, node.x - halfNodeSize, node.y - halfNodeSize, radius);
-            context.arcTo(node.x - halfNodeSize, node.y - halfNodeSize, node.x + halfNodeSize, node.y - halfNodeSize, radius);
-            context.closePath();
-            context.fill();
-            context.stroke();
-        });
-    };    
-
+       
     // creates a new roughjs shape object based on updated coordinates after shape movement
     const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number) => {
         const generator = generatorRef.current;
