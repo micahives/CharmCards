@@ -3,12 +3,14 @@ import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
-import { getShapeAtPosition, drawHighlight, calculateRotationAngle, applyRotation } from '../../utils/canvasHelpers';
+import { getShapeAtPosition, drawHighlight, calculateRotationAngle, applyRotation, getClickedNode } from '../../utils/canvasHelpers';
 
 // need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
+// make the default tool 'select', but also when you're done drawing a shape (handleMouseUp), the tooling switches back to select so that 
+// the hover effects are going.
 
 const DrawingCanvasNew = () => {
-    const [tool, setTool] = useState('rectangle');
+    const [tool, setTool] = useState('select');
     const [action, setAction] = useState<'drawing' | 'moving' | 'rotating' | 'resizing' | 'none'>('none');
     const [startX, setStartX] = useState(0); // x and y coordinate states
     const [startY, setStartY] = useState(0);
@@ -70,19 +72,28 @@ const DrawingCanvasNew = () => {
         if (tool === 'select') {
             const canvas = canvasRef.current;
             if (canvas) {
-                canvas.style.cursor = tool === 'select' ? 'move' : 'crosshair';
+                canvas.style.cursor = tool === 'select' ? 'move' : 'move';
             }
             const shape = getShapeAtPosition(x, y, shapes); 
             if (shape) {
                 setSelectedShape(shape);
-                setAction('moving');
+                const clickedNode = getClickedNode(x, y, shape);
+                if (clickedNode) {
+                    setSelectedNode(clickedNode);
+                    if ('type' in clickedNode) { // add type to nodeType in utils?
+                        setAction(clickedNode.type === 'rotate' ? 'rotating' : 'resizing');
+                    } else {
+                        setAction('moving');
+                    }
+                } else {
+                    setAction('moving');
+                }
                 setStartX(x);
                 setStartY(y);
                 clearCanvas();
                 redrawShapes();
             }
         } else {
-            // account for canvas offset, set x and y coordinates for starting point of drawable object (rect/line/circle)
             setStartX(x);
             setStartY(y);
             setAction('drawing');
@@ -94,11 +105,27 @@ const DrawingCanvasNew = () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        if (tool === 'select' && action === 'none') {
+        if (tool === 'select') {
+            const canvas = event.target as HTMLCanvasElement;
+            canvas.style.cursor = getShapeAtPosition(x, y, shapes) ? 'move' : 'default';
+    
             const shape = getShapeAtPosition(x, y, shapes);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                canvas.style.cursor = shape ? 'crosshair' : 'default';
+            if (shape) {
+                const clickedNode = getClickedNode(x, y, shape);
+                if (clickedNode) {
+                    if ('position' in clickedNode) {
+                        switch (clickedNode.position) {
+                            case 'top-left':
+                            case 'bottom-right':
+                                canvas.style.cursor = 'nwse-resize';
+                                break;
+                            case 'top-right':
+                            case 'bottom-left':
+                                canvas.style.cursor = 'nesw-resize';
+                                break;
+                        }
+                    } 
+                }
             }
         }
 
@@ -145,11 +172,15 @@ const DrawingCanvasNew = () => {
     
             clearCanvas();
             redrawShapes();
-        } else if (action === 'resizing' && selectedShape) {
+        }  else if (action === 'resizing' && selectedShape) {
             const updatedShape = {
                 ...selectedShape,
                 [selectedNode.key]: selectedNode.key === 'x1' || selectedNode.key === 'x2' ? x : y,
-                shape: regenerateShape(selectedShape.type, selectedShape.x1, selectedShape.y1, selectedShape.x2, selectedShape.y2)
+                shape: regenerateShape(selectedShape.type, 
+                    selectedNode.key === 'x1' ? x : selectedShape.x1, 
+                    selectedNode.key === 'y1' ? y : selectedShape.y1, 
+                    selectedNode.key === 'x2' ? x : selectedShape.x2, 
+                    selectedNode.key === 'y2' ? y : selectedShape.y2)
             };
     
             setShapes(prevShapes =>
@@ -188,7 +219,7 @@ const DrawingCanvasNew = () => {
             const y = event.clientY - rect.top;
     
             drawShape(tool, startX, startY, x, y);
-        } else if (action === 'moving') {
+        } else if (action === 'moving' || action === 'resizing' || action === 'rotating') {
             setAction('none');
             // setSelectedShape(null); // need this? 
         }

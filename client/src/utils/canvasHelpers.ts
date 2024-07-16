@@ -107,10 +107,10 @@ export const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: num
 
 export const getClickedNode = (x: number, y: number, shape: Shape) => {
     const nodes = [
-        { x: shape.x1, y: shape.y1, key: 'x1' },
-        { x: shape.x2, y: shape.y1, key: 'x2' },
-        { x: shape.x1, y: shape.y2, key: 'x1' },
-        { x: shape.x2, y: shape.y2, key: 'x2' }
+        { x: shape.x1, y: shape.y1, key: 'x1', position: 'top-left' },
+        { x: shape.x2, y: shape.y1, key: 'x2', position: 'top-right' },
+        { x: shape.x1, y: shape.y2, key: 'x1', position: 'bottom-left' },
+        { x: shape.x2, y: shape.y2, key: 'x2', position: 'bottom-right' }
     ];
 
     const rotateNode = {
