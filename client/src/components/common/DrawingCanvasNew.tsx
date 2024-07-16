@@ -3,7 +3,7 @@ import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
-import { getShapeAtPosition, drawHighlight, calculateRotationAngle, applyRotation, getClickedNode } from '../../utils/canvasHelpers';
+import { getShapeAtPosition, drawHighlight, getClickedNode } from '../../utils/canvasHelpers';
 
 // need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
 // make the default tool 'select', but also when you're done drawing a shape (handleMouseUp), the tooling switches back to select so that 
@@ -11,7 +11,7 @@ import { getShapeAtPosition, drawHighlight, calculateRotationAngle, applyRotatio
 
 const DrawingCanvasNew = () => {
     const [tool, setTool] = useState('select');
-    const [action, setAction] = useState<'drawing' | 'moving' | 'rotating' | 'resizing' | 'none'>('none');
+    const [action, setAction] = useState<'drawing' | 'moving' | 'resizing' | 'none'>('none');
     const [startX, setStartX] = useState(0); // x and y coordinate states
     const [startY, setStartY] = useState(0);
     const [shapes, setShapes] = useState<any[]>([]);
@@ -80,8 +80,8 @@ const DrawingCanvasNew = () => {
                 const clickedNode = getClickedNode(x, y, shape);
                 if (clickedNode) {
                     setSelectedNode(clickedNode);
-                    if ('type' in clickedNode) { // add type to nodeType in utils?
-                        setAction(clickedNode.type === 'rotate' ? 'rotating' : 'resizing');
+                    if ('type' in clickedNode) { 
+                        setAction('resizing');
                     } else {
                         setAction('moving');
                     }
@@ -190,18 +190,7 @@ const DrawingCanvasNew = () => {
             setSelectedShape(updatedShape);
             clearCanvas();
             redrawShapes();
-        } else if (action === 'rotating' && selectedShape) {
-            const angle = calculateRotationAngle(startX, startY, x, y, selectedShape);
-            const rotatedShape = applyRotation(selectedShape, angle, roughCanvasRef.current!.generator);
-    
-            setShapes(prevShapes =>
-                prevShapes.map(shape => (shape.id === selectedShape.id ? rotatedShape : shape))
-            );
-    
-            setSelectedShape(rotatedShape);
-            clearCanvas();
-            redrawShapes();
-        }
+        } 
     };    
     
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -219,9 +208,8 @@ const DrawingCanvasNew = () => {
             const y = event.clientY - rect.top;
     
             drawShape(tool, startX, startY, x, y);
-        } else if (action === 'moving' || action === 'resizing' || action === 'rotating') {
+        } else if (action === 'moving' || action === 'resizing') {
             setAction('none');
-            // setSelectedShape(null); // need this? 
         }
     };    
 

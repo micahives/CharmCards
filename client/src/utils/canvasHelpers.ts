@@ -76,12 +76,6 @@ export const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: num
         { x: x2, y: y2 }
     ];
 
-    const rotateNode = {
-        x: (x1 + x2) / 2,
-        y: y1 - 20,
-        type: 'rotate'
-    };
-
     context.strokeStyle = '#b7b5ed';
     context.fillStyle = 'white';
     context.lineWidth = 2;
@@ -97,12 +91,6 @@ export const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: num
         context.fill();
         context.stroke();
     });
-
-    // Draw rotate node
-    context.beginPath();
-    context.arc(rotateNode.x, rotateNode.y, halfNodeSize, 0, 2 * Math.PI);
-    context.fill();
-    context.stroke();
 };
 
 export const getClickedNode = (x: number, y: number, shape: Shape) => {
@@ -113,65 +101,13 @@ export const getClickedNode = (x: number, y: number, shape: Shape) => {
         { x: shape.x2, y: shape.y2, key: 'x2', position: 'bottom-right' }
     ];
 
-    const rotateNode = {
-        x: (shape.x1 + shape.x2) / 2,
-        y: shape.y1 - 20,
-        type: 'rotate'
-    };
-
     for (const node of nodes) {
         if (Math.abs(x - node.x) < 8 && Math.abs(y - node.y) < 8) {
             return node;
         }
     }
 
-    if (Math.abs(x - rotateNode.x) < 8 && Math.abs(y - rotateNode.y) < 8) {
-        return rotateNode;
-    }
-
     return null;
-};
-
-export const calculateRotationAngle = (startX: number, startY: number, x: number, y: number, shape: Shape) => {
-    const centerX = (shape.x1 + shape.x2) / 2;
-    const centerY = (shape.y1 + shape.y2) / 2;
-
-    const angle1 = Math.atan2(startY - centerY, startX - centerX);
-    const angle2 = Math.atan2(y - centerY, x - centerX);
-
-    return angle2 - angle1;
-};
-
-export const applyRotation = (shape: Shape, angle: number, generator: RoughGenerator) => {
-    // Calculate new coordinates after rotation
-    const centerX = (shape.x1 + shape.x2) / 2;
-    const centerY = (shape.y1 + shape.y2) / 2;
-
-    const rotatePoint = (x: number, y: number) => {
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const originalAngle = Math.atan2(dy, dx);
-        const newAngle = originalAngle + angle;
-
-        return {
-            x: centerX + distance * Math.cos(newAngle),
-            y: centerY + distance * Math.sin(newAngle)
-        };
-    };
-
-    const newCoords1 = rotatePoint(shape.x1, shape.y1);
-    const newCoords2 = rotatePoint(shape.x2, shape.y2);
-
-    // Return updated shape object with new coordinates
-    return {
-        ...shape,
-        x1: newCoords1.x,
-        y1: newCoords1.y,
-        x2: newCoords2.x,
-        y2: newCoords2.y,
-        shape: regenerateShape(shape.type, newCoords1.x, newCoords1.y, newCoords2.x, newCoords2.y, generator)
-    };
 };
 
 export const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number, generator: RoughGenerator) => {
