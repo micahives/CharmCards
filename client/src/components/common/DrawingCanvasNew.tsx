@@ -3,14 +3,14 @@ import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
-import { getShapeAtPosition, drawHighlight, getClickedNode } from '../../utils/canvasHelpers';
+import { getShapeAtPosition, drawHighlight, getClickedNode, resizedCoordinates } from '../../utils/canvasHelpers';
 
 // need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
 // make the default tool 'select', but also when you're done drawing a shape (handleMouseUp), the tooling switches back to select so that 
 // the hover effects are going.
 
-const DrawingCanvasNew = () => {
-    const [tool, setTool] = useState('select');
+const DrawingCanvasNew: React.FC = () => {
+    const [tool, setTool] = useState<'select' | 'line' | 'rectangle' | 'circle'>('select');
     const [action, setAction] = useState<'drawing' | 'moving' | 'resizing' | 'none'>('none');
     const [startX, setStartX] = useState(0); // x and y coordinate states
     const [startY, setStartY] = useState(0);
@@ -39,7 +39,7 @@ const DrawingCanvasNew = () => {
         const rc = roughCanvasRef.current;
         const generator = generatorRef.current;
         const id = uuidv4();
-        let shape;
+        let shape: any;
 
         if (rc && generator) {
             switch (type) {
@@ -69,22 +69,19 @@ const DrawingCanvasNew = () => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
+    
         if (tool === 'select') {
             const canvas = canvasRef.current;
             if (canvas) {
                 canvas.style.cursor = tool === 'select' ? 'move' : 'move';
             }
-            const shape = getShapeAtPosition(x, y, shapes); 
+            const shape = getShapeAtPosition(x, y, shapes);
             if (shape) {
                 setSelectedShape(shape);
                 const clickedNode = getClickedNode(x, y, shape);
                 if (clickedNode) {
                     setSelectedNode(clickedNode);
-                    if ('type' in clickedNode) { 
-                        setAction('resizing');
-                    } else {
-                        setAction('moving');
-                    }
+                    setAction('resizing');
                 } else {
                     setAction('moving');
                 }
@@ -99,6 +96,7 @@ const DrawingCanvasNew = () => {
             setAction('drawing');
         }
     };
+    
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current!.getBoundingClientRect();
@@ -173,25 +171,28 @@ const DrawingCanvasNew = () => {
             clearCanvas();
             redrawShapes();
         }  else if (action === 'resizing' && selectedShape) {
+            const { x1, y1, x2, y2 } = resizedCoordinates(x, y, selectedNode.position, selectedShape);
             const updatedShape = {
                 ...selectedShape,
-                [selectedNode.key]: selectedNode.key === 'x1' || selectedNode.key === 'x2' ? x : y,
-                shape: regenerateShape(selectedShape.type, 
-                    selectedNode.key === 'x1' ? x : selectedShape.x1, 
-                    selectedNode.key === 'y1' ? y : selectedShape.y1, 
-                    selectedNode.key === 'x2' ? x : selectedShape.x2, 
-                    selectedNode.key === 'y2' ? y : selectedShape.y2)
+                x1,
+                y1,
+                x2,
+                y2,
+                shape: regenerateShape(selectedShape.type, x1, y1, x2, y2)
             };
-    
+
             setShapes(prevShapes =>
                 prevShapes.map(shape => (shape.id === selectedShape.id ? updatedShape : shape))
             );
-    
+
             setSelectedShape(updatedShape);
+            setStartX(x);
+            setStartY(y);
+
             clearCanvas();
             redrawShapes();
-        } 
-    };    
+        }
+    };
     
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (action === 'drawing') {

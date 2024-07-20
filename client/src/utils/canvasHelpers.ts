@@ -1,5 +1,3 @@
-import { RoughGenerator } from "roughjs/bin/generator";
-
 export interface Shape {
     id: string;
     type: 'line' | 'rectangle' | 'circle';
@@ -10,18 +8,18 @@ export interface Shape {
     shape: any; // rough.js shape object
 }
 
-export const isWithinShape = (x: number, y: number, shape: Shape): boolean => {
+export const positionWithinShape = (x: number, y: number, shape: Shape): boolean => {
     const { type, x1, y1, x2, y2 } = shape;
     switch (type) {
         case 'rectangle':
             return x >= x1 && x <= x2 && y >= y1 && y <= y2;
         case 'line':
-            // check if point is near the line segment
+            // Check if point is near the line segment
             const distance = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) /
                              Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2));
-            return distance <= 5; // may be adjusted
+            return distance <= 5;
         case 'circle':
-            // check if point is near the circle radius
+            // Check if point is within the circle radius
             const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
             const dist = Math.sqrt(Math.pow(x - x1, 2) + Math.pow(y - y1, 2));
             return dist <= radius;
@@ -30,8 +28,34 @@ export const isWithinShape = (x: number, y: number, shape: Shape): boolean => {
     }
 };
 
-export const getShapeAtPosition = (x: number, y: number, shapes: Shape[]): Shape | undefined => {
-    return shapes.find(shape => isWithinShape(x, y, shape));
+export const getShapeAtPosition = (x: number, y: number, shapes: Shape[]): Shape | null => {
+    return shapes.find(shape => positionWithinShape(x, y, shape)) || null;
+};
+
+export const resizedCoordinates = (x: number, y: number, position: string, shape: Shape) => {
+    // logic to resize the shape based on the clicked node
+    switch (position) {
+        case 'top-left':
+            return { x1: x, y1: y, x2: shape.x2, y2: shape.y2 };
+        case 'top-right':
+            return { x1: shape.x1, y1: y, x2: x, y2: shape.y2 };
+        case 'bottom-left':
+            return { x1: x, y1: shape.y1, x2: shape.x2, y2: y };
+        case 'bottom-right':
+            return { x1: shape.x1, y1: shape.y1, x2: x, y2: y };
+        default:
+            return { x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2 };
+    }
+};
+
+export const adjustShapeCoordinates = (shape: Shape, offsetX: number, offsetY: number): Shape => {
+    return {
+        ...shape,
+        x1: shape.x1 + offsetX,
+        y1: shape.y1 + offsetY,
+        x2: shape.x2 + offsetX,
+        y2: shape.y2 + offsetY,
+    };
 };
 
 export const drawHighlight = (canvas: HTMLCanvasElement, shape: Shape) => {
@@ -95,39 +119,19 @@ export const drawNodes = (context: CanvasRenderingContext2D, x1: number, y1: num
 
 export const getClickedNode = (x: number, y: number, shape: Shape) => {
     const nodes = [
-        { x: shape.x1, y: shape.y1, key: 'x1', position: 'top-left' },
-        { x: shape.x2, y: shape.y1, key: 'x2', position: 'top-right' },
-        { x: shape.x1, y: shape.y2, key: 'x1', position: 'bottom-left' },
-        { x: shape.x2, y: shape.y2, key: 'x2', position: 'bottom-right' }
+        { x: shape.x1 - 4, y: shape.y1 - 4, key: 'x1', position: 'top-left' },
+        { x: shape.x2 + 4, y: shape.y1 - 4, key: 'x2', position: 'top-right' },
+        { x: shape.x1 - 4, y: shape.y2 + 4, key: 'x1', position: 'bottom-left' },
+        { x: shape.x2 + 4, y: shape.y2 + 4, key: 'x2', position: 'bottom-right' }
     ];
 
+    const hitRadius = 15;
+
     for (const node of nodes) {
-        if (Math.abs(x - node.x) < 8 && Math.abs(y - node.y) < 8) {
+        if (Math.abs(x - node.x) < hitRadius && Math.abs(y - node.y) < hitRadius) {
             return node;
         }
     }
 
     return null;
-};
-
-export const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number, generator: RoughGenerator) => {
-    let shape;
-
-    if (generator) {
-        switch (type) {
-            case 'line':
-                shape = generator.line(x1, y1, x2, y2);
-                break;
-            case 'rectangle':
-                shape = generator.rectangle(x1, y1, x2 - x1, y2 - y1);
-                break;
-            case 'circle':
-                const diameter = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) * 2;
-                shape = generator.circle(x1, y1, diameter);
-                break;
-            default:
-                return null;
-        }
-    }
-    return shape;
 };
