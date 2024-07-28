@@ -33,29 +33,28 @@ export const getShapeAtPosition = (x: number, y: number, shapes: Shape[]): Shape
 };
 
 export const resizedCoordinates = (x: number, y: number, position: string, shape: Shape) => {
-    // logic to resize the shape based on the clicked node
+    let { x1, y1, x2, y2 } = shape;
+
     switch (position) {
         case 'top-left':
-            return { x1: x, y1: y, x2: shape.x2, y2: shape.y2 };
+            x1 = x;
+            y1 = y;
+            break;
         case 'top-right':
-            return { x1: shape.x1, y1: y, x2: x, y2: shape.y2 };
+            x2 = x;
+            y1 = y;
+            break;
         case 'bottom-left':
-            return { x1: x, y1: shape.y1, x2: shape.x2, y2: y };
+            x1 = x;
+            y2 = y;
+            break;
         case 'bottom-right':
-            return { x1: shape.x1, y1: shape.y1, x2: x, y2: y };
-        default:
-            return { x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2 };
+            x2 = x;
+            y2 = y;
+            break;
     }
-};
 
-export const adjustShapeCoordinates = (shape: Shape, offsetX: number, offsetY: number): Shape => {
-    return {
-        ...shape,
-        x1: shape.x1 + offsetX,
-        y1: shape.y1 + offsetY,
-        x2: shape.x2 + offsetX,
-        y2: shape.y2 + offsetY,
-    };
+    return { x1, y1, x2, y2 };
 };
 
 export const drawHighlight = (canvas: HTMLCanvasElement, shape: Shape) => {

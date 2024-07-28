@@ -3,7 +3,7 @@ import rough from 'roughjs';
 import { RoughCanvas } from 'roughjs/bin/canvas';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { v4 as uuidv4 } from 'uuid';
-import { getShapeAtPosition, drawHighlight, getClickedNode, resizedCoordinates } from '../../utils/canvasHelpers';
+import { getShapeAtPosition, drawHighlight, getClickedNode, resizedCoordinates, Shape } from '../../utils/canvasHelpers';
 
 // need: selection tool with rotation abilities and highlighting the selected shape, pen tool, text tool, eraser, stroke and color options
 // make the default tool 'select', but also when you're done drawing a shape (handleMouseUp), the tooling switches back to select so that 
@@ -65,6 +65,53 @@ const DrawingCanvasNew: React.FC = () => {
         }
     };
 
+    const createShape = (id: string, x1: number, y1: number, x2: number, y2:number, type: string) => {
+        const generator = generatorRef.current;
+        let roughShape;
+
+        if (generator) {
+            switch (type) {
+                case 'line':
+                    roughShape = generator.line(x1, y1, x2, y2);
+                    break;
+                case 'rectangle':
+                    roughShape = generator.rectangle(x1, y1, x2 - x1, y2 - y1);
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return { id, x1, y1, x2, y2, type, roughShape };
+    };
+
+    const updateShape = (id: string, x1: number, y1: number, x2: number, y2:number, type: string) => {
+        const updatedShape = createShape(id, x1, y1, x2, y2, type);
+        if (updatedShape) {
+            setShapes(prevShapes =>
+                prevShapes.map(shape => shape.id === id ? updatedShape: shape)
+            );
+        }
+    };
+
+    const adjustShapeCoordinates = (shape: Shape) => {
+        const { type, x1, y1, x2, y2 } = shape;
+
+        if (type === 'rectangle') {
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
+            return {x1: minX, y1: minY, x2: maxX, y2: maxY};
+        } else if (type === 'line') {
+            if (x1 < x2 || (x1 === x2 && y1 < y2)) {
+                return { x1, y1, x2, y2 };
+            } else {
+                return { x1: x2, y1: y2, x2: x1, y2: y1 };
+            }
+        }
+    };
+
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
@@ -73,7 +120,7 @@ const DrawingCanvasNew: React.FC = () => {
         if (tool === 'select') {
             const canvas = canvasRef.current;
             if (canvas) {
-                canvas.style.cursor = tool === 'select' ? 'move' : 'move';
+                canvas.style.cursor = 'move';
             }
             const shape = getShapeAtPosition(x, y, shapes);
             if (shape) {
@@ -96,13 +143,12 @@ const DrawingCanvasNew: React.FC = () => {
             setAction('drawing');
         }
     };
-    
 
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-
+    
         if (tool === 'select') {
             const canvas = event.target as HTMLCanvasElement;
             canvas.style.cursor = getShapeAtPosition(x, y, shapes) ? 'move' : 'default';
@@ -122,11 +168,11 @@ const DrawingCanvasNew: React.FC = () => {
                                 canvas.style.cursor = 'nesw-resize';
                                 break;
                         }
-                    } 
+                    }
                 }
             }
         }
-
+    
         if (action === 'drawing') {
             clearCanvas();
             redrawShapes();
@@ -170,32 +216,36 @@ const DrawingCanvasNew: React.FC = () => {
     
             clearCanvas();
             redrawShapes();
-        }  else if (action === 'resizing' && selectedShape) {
+        } else if (action === 'resizing' && selectedShape) {
             const { x1, y1, x2, y2 } = resizedCoordinates(x, y, selectedNode.position, selectedShape);
+            
+            const startX = Math.min(x1, x2);
+            const startY = Math.min(y1, y2);
+            const endX = Math.max(x1, x2);
+            const endY = Math.max(y1, y2);
+    
             const updatedShape = {
                 ...selectedShape,
-                x1,
-                y1,
-                x2,
-                y2,
-                shape: regenerateShape(selectedShape.type, x1, y1, x2, y2)
+                x1: startX,
+                y1: startY,
+                x2: endX,
+                y2: endY,
+                shape: regenerateShape(selectedShape.type, startX, startY, endX, endY)
             };
-
+    
             setShapes(prevShapes =>
                 prevShapes.map(shape => (shape.id === selectedShape.id ? updatedShape : shape))
             );
-
+    
             setSelectedShape(updatedShape);
-            setStartX(x);
-            setStartY(y);
-
+    
             clearCanvas();
             redrawShapes();
         }
-    };
+    };    
     
     const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
-        if (action === 'drawing') {
+        if (action === 'drawing' || action === 'resizing') {
             setAction('none');
     
             if (previewShapeRef.current) {
@@ -209,7 +259,7 @@ const DrawingCanvasNew: React.FC = () => {
             const y = event.clientY - rect.top;
     
             drawShape(tool, startX, startY, x, y);
-        } else if (action === 'moving' || action === 'resizing') {
+        } else if (action === 'moving') {
             setAction('none');
         }
     };    
@@ -241,28 +291,18 @@ const DrawingCanvasNew: React.FC = () => {
         }
     };
        
-    // creates a new roughjs shape object based on updated coordinates after shape movement
     const regenerateShape = (type: string, x1: number, y1: number, x2: number, y2: number) => {
         const generator = generatorRef.current;
-        let shape;
+        if (!generator) return null;
 
-        if (generator) {
-            switch (type) {
-                case 'line':
-                    shape = generator.line(x1, y1, x2, y2);
-                    break;
-                case 'rectangle':
-                    shape = generator.rectangle(x1, y1, x2 - x1, y2 - y1);
-                    break;
-                case 'circle':
-                    const diameter = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) * 2;
-                    shape = generator.circle(x1, y1, diameter);
-                    break;
-                default:
-                    return null;
-            }
+        switch (type) {
+            case 'line':
+                return generator.line(x1, y1, x2, y2);
+            case 'rectangle':
+                return generator.rectangle(x1, y1, x2 - x1, y2 - y1);
+            default:
+                return null;
         }
-        return shape;
     };
 
     const undo = () => {
